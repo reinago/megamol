@@ -9,7 +9,7 @@ my %levels = (error => 1, info => 200, none => 0, warn => 100);
 my $basedir = "u:/src/megamol";
 
 my @exts = qw(.cpp .hpp .h);
-my @ignoredirs = ("\/.git\/", "${basedir}/external/", "${basedir}/build\\S*/");
+my @ignoredirs = ("\/.git\/", "${basedir}/external/", "${basedir}/include/", "${basedir}/build\\S*/");
 
 sub checkdir {
     my $dir = shift;
@@ -60,11 +60,11 @@ sub wanted {
                 
                 my @matches = $clean_file_content =~ /[a-zA-Z:.]*DefaultLog\S+\(\w+\)/gs;
                 if ($#matches > -1) {
-                    print "\n" . "-=" x 30 . "\n";
-                    print $File::Find::name . "\n";
+                    #print "\n" . "-=" x 30 . "\n";
+                    #print $File::Find::name . "\n";
                     foreach my $m (@matches) {
-                        print "-" x 50 . "\n";
-                        print "$m\n";
+                        #print "-" x 50 . "\n";
+                        #print "$m\n";
                         if ($m =~ /DefaultLog.Write(\S+)\((\w+)\)/xs) {
                             my $level = $1;
                             my $alias = $2;
@@ -97,7 +97,8 @@ sub wanted {
                                 }
                             }
                             if (not defined $reallevel) {
-                                print "WTF\n";
+                                print "weird level $level in $name$ext\n";
+                                next;
                             }
                             
                             # try to find messages that have formatted arguments
@@ -108,7 +109,8 @@ sub wanted {
                                 my $rest = $2;
                                 my $havereplace = ($fmt =~ s/%([0-9.]*)l?[sduif]/{}/g);
                                 if ($havereplace == 1 and $1 ne "") {
-                                    print "WTF2\n";
+                                    print "format $fmt not understood in $name$ext\n";
+                                    next;
                                 }
                                 $args = $fmt . $rest;
                             }
@@ -123,14 +125,14 @@ sub wanted {
                         }
                     }
                     # do the replacing
-                    print "\n\n";
+                    #print "\n\n";
                     for (my $x = 0; $x <= $#from; $x++) {
                         $file_content =~ s/\Q$from[$x]/$to[$x]/s;
                     }
-                    print $file_content;
+                    #print $file_content;
                     
                     # TODO: replace file
-                    exit 0;
+                    #exit 0;
                 }
             }
         }
