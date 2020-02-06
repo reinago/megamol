@@ -8,7 +8,9 @@ use File::Basename;
 my %levels = (error => 1, info => 200, none => 0, warn => 100);
 my $basedir = "u:/src/megamol";
 
-my @exts = qw(.cpp .hpp .h);
+# not working on core/src/cluster/ClusterViewMaster and many others :(
+
+my @exts = qw(.cpp .hpp .h .inl);
 my @ignoredirs = ("\/.git\/", "${basedir}/external/", "${basedir}/include/", "${basedir}/build\\S*/");
 
 sub checkdir {
@@ -129,10 +131,11 @@ sub wanted {
                     for (my $x = 0; $x <= $#from; $x++) {
                         $file_content =~ s/\Q$from[$x]/$to[$x]/s;
                     }
-                    #print $file_content;
-                    
-                    # TODO: replace file
-                    #exit 0;
+
+                    # let all hell loose
+                    open (my $fh, ">", $File::Find::name) or die "Could not close " . $File::Find::name; 
+                    print $fh $file_content; 
+                    close($fh) or die "Could not close " . $File::Find::name;  
                 }
             }
         }
