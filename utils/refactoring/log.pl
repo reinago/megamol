@@ -37,25 +37,50 @@ sub wanted {
                 my $file_content = do{local(@ARGV,$/)=$File::Find::name;<>};
                 my @from = ();
                 my @to = ();
+                my %args_to_alias = ();
+                my %alias_to_args = ();
                 
-                my @matches = $file_content =~ /[a-zA-Z:.]*DefaultLog\S+\((?:[^()]++|(?R))*\);/xgs;
+                my $any_hit = $file_content =~ /DefaultLog/s;
+                if (not $any_hit == 1) {
+                    return;
+                }
+                
+                # get rid of all parentheses with potential recursion inside
+                # and replace contents by alias
+                my $parenthesis_cleanup = qr/(\((?:[^()]++|(?R))*\))/s;
+                my $curr_args_entry = "a";
+                while ($file_content =~ /$parenthesis_cleanup/g) {
+                    #print $1 . " = " . $curr_args_entry . "\n";
+                    $args_to_alias{$1} = $curr_args_entry;
+                    $alias_to_args{$curr_args_entry} = $1;
+                    $curr_args_entry++;
+                }
+                my $clean_file_content = $file_content;
+                $clean_file_content =~ s/$parenthesis_cleanup/(${args_to_alias{$1}})/g;
+                
+                my @matches = $clean_file_content =~ /[a-zA-Z:.]*DefaultLog\S+\(\w+\)/gs;
                 if ($#matches > -1) {
                     print "\n" . "-=" x 30 . "\n";
                     print $File::Find::name . "\n";
                     foreach my $m (@matches) {
                         print "-" x 50 . "\n";
                         print "$m\n";
-                        if ($m =~ /DefaultLog.Write(\S+)\(((?:[^()]++|(?R))*)\)/xs) {
+                        if ($m =~ /DefaultLog.Write(\S+)\((\w+)\)/xs) {
                             my $level = $1;
-                            my $args = $2;
-                            print "found candidate: ";
+                            my $alias = $2;
+                            $alias_to_args{$alias} =~ /^\((.*?)\)$/s;
+                            my $args = $1;
+                            #print "found candidate: ";
                             if ($level eq "Msg") {
+                                # split off the errorlevel
                                 $args =~ /^([^,]+),\s*(.*?)$/s;
                                 $level = $1;
                                 $args = $2;
                             }
                             $level = cleanup($level);
                             $args = cleanup($args);
+                            
+                            # find any suffixes to level constants and recover them
                             my $explicit = ($level =~ /\S*LEVEL_(\w+)(?:\s*(.*?))?$/s);
                             my $reallevel;
                             if ($explicit == 1) {
@@ -74,6 +99,8 @@ sub wanted {
                             if (not defined $reallevel) {
                                 print "WTF\n";
                             }
+                            
+                            # try to find messages that have formatted arguments
                             my $format = ($args =~ /^(.*?")((?:,[^,]+)*)$/);
                             if ($format == 1 and $2 ne "") {
                                 #print "format $1 rest $2";
@@ -86,9 +113,13 @@ sub wanted {
                                 $args = $fmt . $rest;
                             }
                             #print "=> level $reallevel\n=> args $args\n";
-                            # TODO: generate new command
-                            push @from, $m;
-                            push @to, "hurzofant($reallevel, $args);"
+                            
+                            #recover original text
+                            my $orig = $m;
+                            $orig =~ s/\Q($alias)/$alias_to_args{$alias}/s;
+                            push @from, $orig;
+                            # generate new command
+                            push @to, "hurzofant($reallevel, $args)"
                         }
                     }
                     # do the replacing
@@ -97,6 +128,8 @@ sub wanted {
                         $file_content =~ s/\Q$from[$x]/$to[$x]/s;
                     }
                     print $file_content;
+                    
+                    # TODO: replace file
                     exit 0;
                 }
             }
