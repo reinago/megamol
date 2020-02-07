@@ -789,7 +789,7 @@ fragSrc.Append( vertSrc.Append(new ShaderSource::VersionSnippet(120)));
     //////////////////////////////////////////////////////
     if( !ci->ShaderSourceFactory().MakeShaderSource( "protein::std::cylinderVertex", vertSrc ) )
     {
-        Log::DefaultLog.WriteMsg ( Log::LEVEL_ERROR, "%: Unable to load vertex shader source for cylinder shader", this->ClassName() );
+        Log::DefaultLog.WriteMsg ( Log::LEVEL_ERROR, "%s: Unable to load vertex shader source for cylinder shader", this->ClassName() );
         return false;
     }
     if( !ci->ShaderSourceFactory().MakeShaderSource( "protein::std::cylinderFragment", fragSrc ) )

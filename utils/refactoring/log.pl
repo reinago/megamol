@@ -36,6 +36,10 @@ sub wanted {
         if (checkdir($File::Find::dir)) {
             my ($name, $dir, $ext) = fileparse($_, @exts);
             if ($ext) {
+                #if ($name eq "PDBWriter" and $ext = ".cpp") {
+                #    print "breakpoint";
+                #}
+                
                 my $file_content = do{local(@ARGV,$/)=$File::Find::name;<>};
                 my @from = ();
                 my @to = ();
@@ -45,6 +49,12 @@ sub wanted {
                 my $any_hit = $file_content =~ /DefaultLog/s;
                 if (not $any_hit == 1) {
                     return;
+                }
+                
+                my $open_count = () = $file_content =~ /\(/g;
+                my $close_count = () = $file_content =~ /\)/g;
+                if ($open_count != $close_count) {
+                    print "warning: $name$ext has unbalanced parentheses!\n";
                 }
                 
                 # get rid of all parentheses with potential recursion inside
@@ -60,7 +70,7 @@ sub wanted {
                 my $clean_file_content = $file_content;
                 $clean_file_content =~ s/$parenthesis_cleanup/(${args_to_alias{$1}})/g;
                 
-                my @matches = $clean_file_content =~ /[a-zA-Z:.]*DefaultLog\S+\(\w+\)/gs;
+                my @matches = $clean_file_content =~ /[a-zA-Z:.]*DefaultLog\S+\s*\(\w+\)/gs;
                 if ($#matches > -1) {
                     #print "\n" . "-=" x 30 . "\n";
                     #print $File::Find::name . "\n";
@@ -88,7 +98,7 @@ sub wanted {
                             if ($explicit == 1) {
                                 #print "----> this does not have a clean level\n";
                                 $reallevel = $levels{lc($1)};
-                                if (defined $2) {
+                                if ($2 ne "") {
                                     $reallevel .= " $2";
                                 }
                             } else {
@@ -124,6 +134,8 @@ sub wanted {
                             push @from, $orig;
                             # generate new command
                             push @to, "hurzofant($reallevel, $args)"
+                        } else {
+                            #print "what is $m in $name$ext!?\n";
                         }
                     }
                     # do the replacing
@@ -133,9 +145,12 @@ sub wanted {
                     }
 
                     # let all hell loose
+                    if ($file_content =~ /DefaultLog/s) {
+                        print "$name$ext is not done\n";
+                    }
                     open (my $fh, ">", $File::Find::name) or die "Could not close " . $File::Find::name; 
                     print $fh $file_content; 
-                    close($fh) or die "Could not close " . $File::Find::name;  
+                    close($fh) or die "Could not close " . $File::Find::name;
                 }
             }
         }

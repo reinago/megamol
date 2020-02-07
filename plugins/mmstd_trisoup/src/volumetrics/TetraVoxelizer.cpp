@@ -265,7 +265,7 @@ VoxelizerFloat TetraVoxelizer::growVolume(FatVoxel *theVolume, Surface &surf,
                         }
                     } else {
                         // thomasbm: surfaces inside this cell might be enclosed by 'surf'
-                    //    if (!CellHasNoGeometry(theVolume, x, y, z)
+                    //    if (!CellHasNoGeometry(theVolume, x, y, z))
                     //        neighbCell.enclosingCandidate = &surf;
                         if (neighbCell.mcCase == 0 && neighbCell.consumedTriangles == 0) {
                             neighbCell.consumedTriangles = 1;

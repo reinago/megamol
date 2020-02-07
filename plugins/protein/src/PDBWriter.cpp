@@ -159,7 +159,7 @@ bool PDBWriter::Start(void) {
     // Check whether the selected frames are valid
     if (maxFrame >= frameCnt) {
         Log::DefaultLog.WriteMsg (Log::LEVEL_ERROR,
-            "%s: Invalid frame selection (max frame is %u, but number of frames is %u",
+            "%s: Invalid frame selection (max frame is %u, but number of frames is %u)",
             this->ClassName(), maxFrame, frameCnt);
         this->jobDone = true;
         return false;

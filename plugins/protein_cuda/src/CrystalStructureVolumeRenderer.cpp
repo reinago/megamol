@@ -657,7 +657,7 @@ bool protein_cuda::CrystalStructureVolumeRenderer::CalcDensityTex(
 
                 // Set color according to coloring mode (LIC, Uni color are
                 // set directly in the shader and therefore don't need a
-                // texture
+                // texture)
 
 #if (defined(NOCLIP_ISOSURF) && (NOCLIP_ISOSURF))
                 // Only add to density grid, if dipole is visible
