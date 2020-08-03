@@ -8,7 +8,7 @@
 
 #include "stdafx.h"
 #include "SphereRenderer.h"
-
+#include "mmcore/param/Vector3fParam.h"
 
 using namespace megamol::core;
 using namespace megamol::core::moldyn;
@@ -94,6 +94,8 @@ SphereRenderer::SphereRenderer(void) : view::Renderer3DModule_2()
     , useLocalBBoxParam("useLocalBbox", "Enforce usage of local bbox for camera setup")
     , selectColorParam("flag storage::selectedColor", "Color for selected spheres in flag storage.")
     , softSelectColorParam("flag storage::softSelectedColor", "Color for soft selected spheres in flag storage.")
+    , numInstancesParam("instances", "number of dataset replications in X, Y, Z direction")
+    , instanceOffsetParam("instOffset", "offset per instance in X, Y, Z")
     , alphaScalingParam("splat::alphaScaling", "Splat: Scaling factor for particle alpha.")
     , attenuateSubpixelParam(
         "splat::attenuateSubpixel", "Splat: Attenuate alpha of points that should have subpixel size.")
@@ -150,6 +152,12 @@ SphereRenderer::SphereRenderer(void) : view::Renderer3DModule_2()
 
     this->softSelectColorParam << new param::ColorParam(1.0f, 0.5f, 0.5f, 1.0f);
     this->MakeSlotAvailable(&this->softSelectColorParam);
+
+    this->numInstancesParam << new param::Vector3fParam(vislib::math::Vector<float, 3>(1.0f, 1.0f, 1.0f), vislib::math::Vector<float, 3>(1.0f, 1.0f, 1.0f));
+    this->MakeSlotAvailable(&this->numInstancesParam);
+
+    this->instanceOffsetParam << new param::Vector3fParam(vislib::math::Vector<float, 3>(0.0f, 0.0f, 0.0f));
+    this->MakeSlotAvailable(&this->instanceOffsetParam);
 
     this->alphaScalingParam << new param::FloatParam(5.0f);
     this->MakeSlotAvailable(&this->alphaScalingParam);
@@ -1312,6 +1320,10 @@ bool SphereRenderer::renderSSBO(view::CallRender3D_2& call, MultiParticleDataCal
         glUniformMatrix4fv(this->newShader->ParameterLocation("MVPinv"), 1, GL_FALSE, glm::value_ptr(this->curMVPinv));
         glUniformMatrix4fv(this->newShader->ParameterLocation("MVPtransp"), 1, GL_FALSE, glm::value_ptr(this->curMVPtransp));
 
+        glUniform3fv(this->newShader->ParameterLocation("instancing_offset"), 1, this->instanceOffsetParam.Param<param::Vector3fParam>()->Value().PeekComponents());
+        auto ni_temp = this->numInstancesParam.Param<param::Vector3fParam>()->Value();
+        glm::ivec3 numInstances = glm::ivec3(static_cast<int>(ni_temp.X()), static_cast<int>(ni_temp.Y()), static_cast<int>(ni_temp.Z()));
+
         unsigned int colBytes, vertBytes, colStride, vertStride;
         bool interleaved;
         const bool staticData = this->useStaticDataParam.Param<param::BoolParam>()->Value();
@@ -1336,6 +1348,15 @@ bool SphereRenderer::renderSSBO(view::CallRender3D_2& call, MultiParticleDataCal
                     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, SSBOvertexBindingPoint, bufA.GetHandle(x), 0,
                         bufA.GetMaxNumItemsPerChunk() * vertStride);
                     glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(actualItems));
+                    for (int instX = 0; instX < numInstances.x; instX++) {
+                        for (int instY = 0; instY < numInstances.y; instY++) {
+                            for (int instZ = 0; instZ < numInstances.z; instZ++) {
+                                glUniform3i(this->newShader->ParameterLocation("instancing_index"), instX, instY, instZ);
+                                glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(actualItems));
+                            }
+                        }
+                    }
+
                     //bufA.SignalCompletion();
                 }
             }
@@ -1357,7 +1378,15 @@ bool SphereRenderer::renderSSBO(view::CallRender3D_2& call, MultiParticleDataCal
                     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
                     glBindBufferRange(
                         GL_SHADER_STORAGE_BUFFER, SSBOvertexBindingPoint, this->streamer.GetHandle(), dstOff, dstLen);
-                    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(numItems));
+                    //glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(numItems));
+                    for (int instX = 0; instX < numInstances.x; instX++) {
+                        for (int instY = 0; instY < numInstances.y; instY++) {
+                            for (int instZ = 0; instZ < numInstances.z; instZ++) {
+                                glUniform3i(this->newShader->ParameterLocation("instancing_index"), instX, instY, instZ);
+                                glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(numItems));
+                            }
+                        }
+                    }
                     this->streamer.SignalCompletion(sync);
                 }
             }
@@ -1386,7 +1415,15 @@ bool SphereRenderer::renderSSBO(view::CallRender3D_2& call, MultiParticleDataCal
                     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, SSBOcolorBindingPoint, colA.GetHandle(x));
                     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, SSBOcolorBindingPoint, colA.GetHandle(x),
                         0, colA.GetMaxNumItemsPerChunk() * colStride);
-                    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(actualItems));
+                    //glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(actualItems));
+                    for (int instX = 0; instX < numInstances.x; instX++) {
+                        for (int instY = 0; instY < numInstances.y; instY++) {
+                            for (int instZ = 0; instZ < numInstances.z; instZ++) {
+                                glUniform3i(this->newShader->ParameterLocation("instancing_index"), instX, instY, instZ);
+                                glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(actualItems));
+                            }
+                        }
+                    }
                     //bufA.SignalCompletion();
                     //colA.SignalCompletion();
                 }
@@ -1413,7 +1450,15 @@ bool SphereRenderer::renderSSBO(view::CallRender3D_2& call, MultiParticleDataCal
                         GL_SHADER_STORAGE_BUFFER, SSBOvertexBindingPoint, this->streamer.GetHandle(), dstOff, dstLen);
                     glBindBufferRange(GL_SHADER_STORAGE_BUFFER, SSBOcolorBindingPoint, this->colStreamer.GetHandle(),
                         dstOff2, dstLen2);
-                    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(numItems));
+                    //glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(numItems));
+                    for (int instX = 0; instX < numInstances.x; instX++) {
+                        for (int instY = 0; instY < numInstances.y; instY++) {
+                            for (int instZ = 0; instZ < numInstances.z; instZ++) {
+                                glUniform3i(this->newShader->ParameterLocation("instancing_index"), instX, instY, instZ);
+                                glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(numItems));
+                            }
+                        }
+                    }
                     this->streamer.SignalCompletion(sync);
                     this->colStreamer.SignalCompletion(sync2);
                 }
@@ -2428,7 +2473,7 @@ std::shared_ptr<vislib::graphics::gl::GLSLShader> SphereRenderer::generateShader
         v2->Insert(9, declarationSnip);
         // Generated shader code snippet is inserted after ssbo_vert_mainstart.glsl (Consider new index through first
         // insertion)
-        v2->Insert(11, codeSnip);
+        v2->Insert(12, codeSnip);
 
         std::shared_ptr<ShaderSource> vss(v2);
         this->theShaders.emplace(std::make_pair(std::make_tuple(c, p, interleaved), makeShader(v2, this->fragShader)));

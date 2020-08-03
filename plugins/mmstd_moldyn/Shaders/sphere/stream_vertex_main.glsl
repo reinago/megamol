@@ -1,6 +1,6 @@
 
-    vec4 inPos = inPosition;
-    inPos.w = 1.0;
+    vec4 inPos = vec4(applyInstancing(inPosition.xyz), 1.0);
+    //inPos.w = 1.0;
 
 #ifdef WITH_SCALING
     rad *= scaling;

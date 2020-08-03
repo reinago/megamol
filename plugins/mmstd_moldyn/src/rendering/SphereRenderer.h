@@ -361,6 +361,8 @@ namespace rendering {
         megamol::core::param::ParamSlot useLocalBBoxParam;
         megamol::core::param::ParamSlot selectColorParam;
         megamol::core::param::ParamSlot softSelectColorParam;
+        megamol::core::param::ParamSlot numInstancesParam;
+        megamol::core::param::ParamSlot instanceOffsetParam;
 
         // Affects only Splat rendering ---------------------------------------
 

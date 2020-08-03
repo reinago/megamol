@@ -14,6 +14,7 @@
         <snippet name="bitflags::main"/>
         <snippet name="core_utils::tflookup"/>
         <snippet name="core_utils::tfconvenience"/>
+        <snippet name="core_utils::instancingconvenience"/>
         <snippet name="sphere_flags::vertex_attributes"/>                 
         <snippet name="MainStart"        type="file">sphere/stream_vertex_mainstart.glsl</snippet>
         <snippet name="sphere_flags::vertex_getflag"/>         
