@@ -130,7 +130,7 @@ public:
 private:
 
     /** The value of the parameter */
-    ColorType val;
+    ColorType val = {0.f,0.f,0.f,0.f};
 
 }; /* end class ColorParam */
 
