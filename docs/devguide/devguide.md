@@ -6,27 +6,30 @@ This guide is intended to give MegaMol developers a useful insight into the inte
 
 ## Contents
 
-- [Create new Plugin](#create-new-plugin)
-    - [Add own plugin using the template](#add-own-plugin-using-the-template) 
-- [Create GLSL Shader with utility classes](#create-glsl-shader-with-utility-classes)
-- [Bi-Directional Communication across Modules](#bi-directional-communication-across-modules)
-    - [Recipe](#recipe) 
-    - [Usage: ```DATACallRead```](#usage-datacallread) 
-    - [Usage: ```DataCallWrite```](#usage-datacallwrite) 
-- [Synchronized Selection across Modules](#synchronized-selection-across-modules)
-    - [FlagStorage](#flagstorage) 
-    - [FlagStorage_GL](#flagstorage_gl) 
-- [1D Transfer Function](#1d-transfer-function)  
-    - [Usage](#usage)  
-- [Graph Manipulation](#graph-manipulation)
-    - [Graph Manipulation Queues](#graph-manipulation-queues) 
-- [Build System](#build-system)
-    - [External dependencies](#external-dependencies) 
-        - [Using external dependencies](#using-external-dependencies) 
-        - [Adding new external dependencies](#adding-new-external-dependencies) 
-          - [Header-only libraries](#header-only-libraries) 
-          - [Built libraries](#built-libraries) 
-- [GUI](#gui)
+- [MegaMol Developer Guide](#megamol-developer-guide)
+  - [Contents](#contents)
+  - [Create new Plugin](#create-new-plugin)
+    - [Add own plugin using the template](#add-own-plugin-using-the-template)
+  - [Create GLSL Shader with utility classes](#create-glsl-shader-with-utility-classes)
+    - [Shader location](#shader-location)
+  - [Bi-Directional Communication across Modules](#bi-directional-communication-across-modules)
+    - [Recipe](#recipe)
+      - [Usage: ```DATACallRead```](#usage-datacallread)
+      - [Usage: ```DataCallWrite```](#usage-datacallwrite)
+  - [Synchronized Selection across Modules](#synchronized-selection-across-modules)
+    - [FlagStorage](#flagstorage)
+    - [FlagStorage_GL](#flagstorage_gl)
+  - [1D Transfer Function](#1d-transfer-function)
+    - [Usage](#usage)
+  - [Graph Manipulation](#graph-manipulation)
+    - [Graph Manipulation Queues](#graph-manipulation-queues)
+  - [Build System](#build-system)
+    - [External dependencies](#external-dependencies)
+      - [Using external dependencies](#using-external-dependencies)
+      - [Adding new external dependencies](#adding-new-external-dependencies)
+        - [Header-only libraries](#header-only-libraries)
+        - [Built libraries](#built-libraries)
+  - [GUI](#gui)
     - [Parameter Widgets](#parameter-widgets)
     - [Window/PopUp/Notification for Frontend Service](#windowpopupnotification-for-frontend-service)
 
@@ -66,6 +69,8 @@ Required headers:
 - ```mmcore/utility/graphics/GLSLShader.h```
 - ```mmcore/CoreInstance.h```
   
+***TODO*** update to ```"mmcore/utility/ShaderFactory.h"```
+
 Before creating a shader program with this wrapper, ```compiler_options``` need to be retrieved from ```CoreInstance```.
 This ```compiler_options``` instance contains default shader paths and default options.
 Additional include paths and definitions can be added prior to program creation.
@@ -85,7 +90,11 @@ Uniform locations are retrieved at construction of GLSLShader instance.
 
 Within source files, includes can be defined in standard C style: ```#include "common.h"```
 
-Shader program can be created manually by calling ```megamol::core::utility::make_program``` from ```mmcore/utility/ShaderFactory.h``` (same parameter set as GLSLShader ctor).
+Shader programs can be created manually by calling ```megamol::core::utility::make_program``` from ```mmcore/utility/ShaderFactory.h``` (same parameter set as GLSLShader ctor).
+
+### Shader location
+
+By convention, shaders are located in the core or a plugin inside a ```Shaders/<core|plugin_name>``` directory. To pass such a shader to the shader factory, you can use ```std::filesystem::path("core/shadername.vert.glsl")``` or the like. The additional subdirectory avoids naming conflicts since during installation all shaders are collected in ```<INSTALL_PREFIX>/share/shaders```.
 
 ## Bi-Directional Communication across Modules
 
