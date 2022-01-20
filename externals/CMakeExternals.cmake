@@ -925,6 +925,24 @@ function(require_external NAME)
     external_get_property(tracking SOURCE_DIR)
     set(tracking_files "${SOURCE_DIR}/tracking/conf/tracking.conf" PARENT_SCOPE)
 
+  # vroom
+  elseif (NAME STREQUAL "vroom")
+    if (TARGET vroom)
+      return()
+    endif ()
+
+    set(VROOM_LIB "lib/vroom.lib")
+
+    add_external_project(vroom STATIC
+      GIT_REPOSITORY https://github.com/reinago/vroom.git
+      GIT_TAG cmake-standalone
+      BUILD_BYPRODUCTS "<INSTALL_DIR>/${VROOM_LIB}"
+    )
+
+    add_external_library(vroom
+      LIBRARY ${VROOM_LIB}
+    )
+
   # vtkm
   elseif (NAME STREQUAL "vtkm")
     if (TARGET vtkm)

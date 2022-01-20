@@ -26,6 +26,9 @@
 #include <sstream>
 #include <vector>
 
+#define VROOM_STANDALONE
+#include "delimited_index.h"
+
 using namespace megamol::datatools;
 using namespace megamol::datatools::table;
 using namespace megamol;
@@ -170,290 +173,315 @@ void CSVDataSource::assertData(void) {
     this->columns.clear();
     this->values.clear();
 
+    bool use_vroom = true;
+
     auto filename = this->filenameSlot.Param<core::param::FilePathParam>()->Value();
+    auto delim = this->colSepSlot.Param<core::param::StringParam>()->Value();
+    auto has_header = this->headerNamesSlot.Param<core::param::BoolParam>()->Value();
+    auto skip_preface = this->skipPrefaceSlot.Param<core::param::IntParam>()->Value();
+    auto vroom_errors = std::make_shared<class vroom_errors>();
 
-    try {
-        vislib::sys::ASCIIFileBuffer file;
-
-        // 1. Load the whole file into memory (FAST!)
-        //////////////////////////////////////////////////////////////////////
-        if (!file.LoadFile(filename.native().c_str(), vislib::sys::ASCIIFileBuffer::PARSING_LINES))
-            throw vislib::Exception(__FILE__, __LINE__);
-        if (file.Count() < 2)
-            throw vislib::Exception("No data in CSV file", __FILE__, __LINE__);
-
-        // 2. Determine the first row, column separator, and decimal point
-        //////////////////////////////////////////////////////////////////////
-        int firstHeaRow = this->skipPrefaceSlot.Param<core::param::IntParam>()->Value();
-        int firstDatRow = this->skipPrefaceSlot.Param<core::param::IntParam>()->Value();
-        if (headerNamesSlot.Param<core::param::BoolParam>()->Value())
-            firstDatRow++;
-        if (headerTypesSlot.Param<core::param::BoolParam>()->Value())
-            firstDatRow++;
-
-        auto comment = vislib::StringA(this->commentPrefixSlot.Param<core::param::StringParam>()->Value().c_str());
-        if (!comment.IsEmpty()) {
-            // Skip comments at the beginning of the file.
-            while (firstHeaRow < file.Count()) {
-                if (!vislib::StringA(file[firstHeaRow]).StartsWith(comment)) {
-                    break;
-                }
-                firstHeaRow++;
-                firstDatRow++;
-            }
-        }
-
-        vislib::StringA colSep(this->colSepSlot.Param<core::param::StringParam>()->Value().c_str());
-        if (colSep.IsEmpty()) {
-            // Detect column separator
-            const char ColSepCanidates[] = {'\t', ';', ',', '|'};
-            vislib::StringA l1(file[firstHeaRow]);
-            vislib::StringA l2(file[firstHeaRow]);
-            for (int i = 0; i < sizeof(ColSepCanidates) / sizeof(char); ++i) {
-                SIZE_T c1 = l1.Count(ColSepCanidates[i]);
-                if ((c1 > 0) && (c1 == l2.Count(ColSepCanidates[i]))) {
-                    colSep.Append(ColSepCanidates[i]);
-                    break;
-                }
-            }
-            if (colSep.IsEmpty()) {
-                throw vislib::Exception("Failed to detect column separator", __FILE__, __LINE__);
-            }
-        }
-
-        DecimalSeparator decType =
-            static_cast<DecimalSeparator>(this->decSepSlot.Param<core::param::EnumParam>()->Value());
-        if (decType == DecimalSeparator::Unknown) {
-            // Detect decimal type
-            vislib::Array<vislib::StringA> tokens(vislib::StringTokeniserA::Split(file[firstDatRow], colSep, false));
-            for (SIZE_T i = 0; i < tokens.Count(); i++) {
-                bool hasDot = tokens[i].Contains('.');
-                bool hasComma = tokens[i].Contains(',');
-                if (hasDot && !hasComma) {
-                    decType = DecimalSeparator::US;
-                    break;
-                } else if (hasComma && !hasDot) {
-                    decType = DecimalSeparator::DE;
-                    break;
-                }
-            }
-            if (decType == DecimalSeparator::Unknown) {
-                // Assume US format if detection failed.
-                decType = DecimalSeparator::US;
-            }
-        }
-
-        // 3. Table layout is now clear... determine column headers.
-        //////////////////////////////////////////////////////////////////////
-        vislib::Array<vislib::StringA> dimNames;
-        if (headerNamesSlot.Param<core::param::BoolParam>()->Value()) {
-            dimNames = vislib::StringTokeniserA::Split(file[firstHeaRow], colSep, false);
-            firstHeaRow++;
-        } else {
-            dimNames = vislib::StringTokeniserA::Split(file[firstHeaRow], colSep, false);
-            for (SIZE_T i = 0; i < dimNames.Count(); ++i) {
-                dimNames[i].Format("Dim %d", static_cast<int>(i));
-            }
-        }
-        this->columns.resize(dimNames.Count());
+    if (use_vroom) {
+        auto idx = vroom::delimited_index(filename.generic_string().c_str(), delim.c_str(), '"', true, false, false,
+            has_header, skip_preface, -1, "#", true, vroom_errors, 8, false);
+        this->columns.resize(idx.num_columns());
         this->values.clear();
-
-        bool hasCatDims = false;
-        if (headerTypesSlot.Param<core::param::BoolParam>()->Value()) {
-            vislib::Array<vislib::StringA> tokens(vislib::StringTokeniserA::Split(file[firstHeaRow], colSep, false));
-            for (SIZE_T i = 0; i < dimNames.Count(); i++) {
-                TableDataCall::ColumnType type = TableDataCall::ColumnType::QUANTITATIVE;
-                if (tokens.Count() > i && tokens[i].Equals("CATEGORICAL", true)) {
-                    type = TableDataCall::ColumnType::CATEGORICAL;
-                    hasCatDims = true;
-                }
-                this->columns[i]
-                    .SetName(dimNames[i].PeekBuffer())
-                    .SetType(type)
-                    .SetMinimumValue(0.0f)
-                    .SetMaximumValue(1.0f);
-            }
-        } else {
-            for (SIZE_T i = 0; i < dimNames.Count(); i++) {
-                this->columns[i]
-                    .SetName(dimNames[i].PeekBuffer())
-                    .SetType(TableDataCall::ColumnType::QUANTITATIVE)
-                    .SetMinimumValue(0.0f)
-                    .SetMaximumValue(1.0f);
-            }
+        
+        //auto head = idx.get_row(0);
+        //auto vroom_header = idx.get_header();
+        for (uint32_t i = 0; i < idx.columns_; ++i) {
+            auto col = idx.get_column(i);
+            this->columns[i]
+            //    .SetName(vroom_header->at(i).str())
+                .SetType(TableDataCall::ColumnType::QUANTITATIVE)
+                .SetMinimumValue(0.0f)
+                .SetMaximumValue(1.0f);
         }
+    } else {
+        try {
+            vislib::sys::ASCIIFileBuffer file;
 
-        // 4. Data format is now clear... finally parse actual data
-        //////////////////////////////////////////////////////////////////////
-        size_t colCnt = static_cast<size_t>(this->columns.size());
-        size_t rowCnt = static_cast<size_t>(file.Count() - firstDatRow);
-        int colSepEnd = colSep.Length() - 1;
+            // 1. Load the whole file into memory (FAST!)
+            //////////////////////////////////////////////////////////////////////
+            if (!file.LoadFile(filename.native().c_str(), vislib::sys::ASCIIFileBuffer::PARSING_LINES))
+                throw vislib::Exception(__FILE__, __LINE__);
+            if (file.Count() < 2)
+                throw vislib::Exception("No data in CSV file", __FILE__, __LINE__);
 
-        // Test for empty lines at the end
-        for (; rowCnt > 0; --rowCnt) {
-            const char* start = file[firstDatRow + rowCnt - 1];
-            const char* end = start;
-            size_t col = 0;
-            while ((*end != '\0') && (col < colCnt)) {
-                int colSepPos = 0;
-                while ((*end != '\0') && ((*end != colSep[colSepEnd]) || (colSepEnd != colSepPos))) {
-                    if (*end == colSep[colSepPos])
-                        colSepPos++;
-                    else
-                        colSepPos = 0;
-                    ++end;
+            // 2. Determine the first row, column separator, and decimal point
+            //////////////////////////////////////////////////////////////////////
+            int firstHeaRow = this->skipPrefaceSlot.Param<core::param::IntParam>()->Value();
+            int firstDatRow = this->skipPrefaceSlot.Param<core::param::IntParam>()->Value();
+            if (headerNamesSlot.Param<core::param::BoolParam>()->Value())
+                firstDatRow++;
+            if (headerTypesSlot.Param<core::param::BoolParam>()->Value())
+                firstDatRow++;
+
+            auto comment = vislib::StringA(this->commentPrefixSlot.Param<core::param::StringParam>()->Value().c_str());
+            if (!comment.IsEmpty()) {
+                // Skip comments at the beginning of the file.
+                while (firstHeaRow < file.Count()) {
+                    if (!vislib::StringA(file[firstHeaRow]).StartsWith(comment)) {
+                        break;
+                    }
+                    firstHeaRow++;
+                    firstDatRow++;
                 }
-                col++;
             }
-            if (col >= colCnt)
-                break; // we found the last line containing a full data set
-        }
 
-        // Parse in parallel, assuming all lines will work
-        std::vector<std::map<std::string, float>> catMaps;
-        int thCnt = omp_get_max_threads();
-        catMaps.resize(colCnt * thCnt);
-        values.resize(colCnt * rowCnt);
-        bool hasInvalids = false;
+            vislib::StringA colSep(this->colSepSlot.Param<core::param::StringParam>()->Value().c_str());
+            if (colSep.IsEmpty()) {
+                // Detect column separator
+                const char ColSepCanidates[] = {'\t', ';', ',', '|'};
+                vislib::StringA l1(file[firstHeaRow]);
+                vislib::StringA l2(file[firstHeaRow]);
+                for (int i = 0; i < sizeof(ColSepCanidates) / sizeof(char); ++i) {
+                    SIZE_T c1 = l1.Count(ColSepCanidates[i]);
+                    if ((c1 > 0) && (c1 == l2.Count(ColSepCanidates[i]))) {
+                        colSep.Append(ColSepCanidates[i]);
+                        break;
+                    }
+                }
+                if (colSep.IsEmpty()) {
+                    throw vislib::Exception("Failed to detect column separator", __FILE__, __LINE__);
+                }
+            }
+
+            DecimalSeparator decType =
+                static_cast<DecimalSeparator>(this->decSepSlot.Param<core::param::EnumParam>()->Value());
+            if (decType == DecimalSeparator::Unknown) {
+                // Detect decimal type
+                vislib::Array<vislib::StringA> tokens(
+                    vislib::StringTokeniserA::Split(file[firstDatRow], colSep, false));
+                for (SIZE_T i = 0; i < tokens.Count(); i++) {
+                    bool hasDot = tokens[i].Contains('.');
+                    bool hasComma = tokens[i].Contains(',');
+                    if (hasDot && !hasComma) {
+                        decType = DecimalSeparator::US;
+                        break;
+                    } else if (hasComma && !hasDot) {
+                        decType = DecimalSeparator::DE;
+                        break;
+                    }
+                }
+                if (decType == DecimalSeparator::Unknown) {
+                    // Assume US format if detection failed.
+                    decType = DecimalSeparator::US;
+                }
+            }
+
+            // 3. Table layout is now clear... determine column headers.
+            //////////////////////////////////////////////////////////////////////
+            vislib::Array<vislib::StringA> dimNames;
+            if (headerNamesSlot.Param<core::param::BoolParam>()->Value()) {
+                dimNames = vislib::StringTokeniserA::Split(file[firstHeaRow], colSep, false);
+                firstHeaRow++;
+            } else {
+                dimNames = vislib::StringTokeniserA::Split(file[firstHeaRow], colSep, false);
+                for (SIZE_T i = 0; i < dimNames.Count(); ++i) {
+                    dimNames[i].Format("Dim %d", static_cast<int>(i));
+                }
+            }
+            this->columns.resize(dimNames.Count());
+            this->values.clear();
+
+            bool hasCatDims = false;
+            if (headerTypesSlot.Param<core::param::BoolParam>()->Value()) {
+                vislib::Array<vislib::StringA> tokens(
+                    vislib::StringTokeniserA::Split(file[firstHeaRow], colSep, false));
+                for (SIZE_T i = 0; i < dimNames.Count(); i++) {
+                    TableDataCall::ColumnType type = TableDataCall::ColumnType::QUANTITATIVE;
+                    if (tokens.Count() > i && tokens[i].Equals("CATEGORICAL", true)) {
+                        type = TableDataCall::ColumnType::CATEGORICAL;
+                        hasCatDims = true;
+                    }
+                    this->columns[i]
+                        .SetName(dimNames[i].PeekBuffer())
+                        .SetType(type)
+                        .SetMinimumValue(0.0f)
+                        .SetMaximumValue(1.0f);
+                }
+            } else {
+                for (SIZE_T i = 0; i < dimNames.Count(); i++) {
+                    this->columns[i]
+                        .SetName(dimNames[i].PeekBuffer())
+                        .SetType(TableDataCall::ColumnType::QUANTITATIVE)
+                        .SetMinimumValue(0.0f)
+                        .SetMaximumValue(1.0f);
+                }
+            }
+
+            // 4. Data format is now clear... finally parse actual data
+            //////////////////////////////////////////////////////////////////////
+            size_t colCnt = static_cast<size_t>(this->columns.size());
+            size_t rowCnt = static_cast<size_t>(file.Count() - firstDatRow);
+            int colSepEnd = colSep.Length() - 1;
+
+            // Test for empty lines at the end
+            for (; rowCnt > 0; --rowCnt) {
+                const char* start = file[firstDatRow + rowCnt - 1];
+                const char* end = start;
+                size_t col = 0;
+                while ((*end != '\0') && (col < colCnt)) {
+                    int colSepPos = 0;
+                    while ((*end != '\0') && ((*end != colSep[colSepEnd]) || (colSepEnd != colSepPos))) {
+                        if (*end == colSep[colSepPos])
+                            colSepPos++;
+                        else
+                            colSepPos = 0;
+                        ++end;
+                    }
+                    col++;
+                }
+                if (col >= colCnt)
+                    break; // we found the last line containing a full data set
+            }
+
+            // Parse in parallel, assuming all lines will work
+            std::vector<std::map<std::string, float>> catMaps;
+            int thCnt = omp_get_max_threads();
+            catMaps.resize(colCnt * thCnt);
+            values.resize(colCnt * rowCnt);
+            bool hasInvalids = false;
 
 #pragma omp parallel for
-        for (long long idx = 0; idx < static_cast<long long>(rowCnt); ++idx) {
-            int thId = omp_get_thread_num();
-            const char* start = file[static_cast<size_t>(firstDatRow + idx)];
-            const char* end = start;
-            size_t col = 0;
-            while ((*end != '\0') && (col < colCnt)) {
-                std::map<std::string, float>& catMap = catMaps[thId + col * thCnt];
-                int colSepPos = 0;
-                while ((*end != '\0') && ((*end != colSep[colSepEnd]) || (colSepEnd != colSepPos))) {
-                    if (*end == colSep[colSepPos])
-                        colSepPos++;
-                    else
-                        colSepPos = 0;
-                    ++end;
-                }
-
-                if (this->columns[col].Type() == TableDataCall::ColumnType::QUANTITATIVE) {
-                    if (decType == DecimalSeparator::DE) {
-                        for (char* ez = const_cast<char*>(start); ez != end; ++ez)
-                            if (*ez == ',')
-                                *ez = '.';
+            for (long long idx = 0; idx < static_cast<long long>(rowCnt); ++idx) {
+                int thId = omp_get_thread_num();
+                const char* start = file[static_cast<size_t>(firstDatRow + idx)];
+                const char* end = start;
+                size_t col = 0;
+                while ((*end != '\0') && (col < colCnt)) {
+                    std::map<std::string, float>& catMap = catMaps[thId + col * thCnt];
+                    int colSepPos = 0;
+                    while ((*end != '\0') && ((*end != colSep[colSepEnd]) || (colSepEnd != colSepPos))) {
+                        if (*end == colSep[colSepPos])
+                            colSepPos++;
+                        else
+                            colSepPos = 0;
+                        ++end;
                     }
-                    double value = parseValue(start, end);
-                    values[static_cast<size_t>(idx * colCnt + col)] = static_cast<float>(value);
-                    if (std::isnan(value)) {
-                        hasInvalids = true;
-                    }
-                } else if (this->columns[col].Type() == TableDataCall::ColumnType::CATEGORICAL) {
-                    assert(hasCatDims);
-                    std::map<std::string, float>::iterator cmi = catMap.find(start);
-                    if (cmi == catMap.end()) {
-                        cmi = catMap
-                                  .insert(std::pair<std::string, float>(
-                                      start, static_cast<float>(thId + thCnt * catMap.size())))
-                                  .first;
-                    }
-                    values[static_cast<size_t>(idx * colCnt + col)] = cmi->second;
-                } else {
-                    assert(false);
-                }
 
-                col++;
-                if (*end != '\0') {
-                    start = end + 1;
-                    end = start;
-                }
-            }
-            for (; col < colCnt; ++col) {
-                values[static_cast<size_t>(idx * colCnt + col)] = std::numeric_limits<float>::quiet_NaN();
-                hasInvalids = true;
-            }
-        }
-
-        // Report invalid data if present (note: do not drop data!)
-        if (hasInvalids) {
-            megamol::core::utility::log::Log::DefaultLog.WriteWarn("CSV file contains invalid data:");
-            for (size_t c = 0; c < colCnt; ++c) {
-                std::stringstream ss;
-                bool invalidColumn = true;
-                for (size_t r = 0; r < rowCnt; ++r) {
-                    float value = values[r * colCnt + c];
-                    if (std::isnan(value)) {
-                        size_t line = 1 + firstDatRow + r;
-                        ss << line << " ";
-                    } else {
-                        invalidColumn = false;
-                    }
-                }
-                std::string lines = ss.str();
-                if (invalidColumn) {
-                    megamol::core::utility::log::Log::DefaultLog.WriteWarn("  lines in column %d: all", 1 + c);
-                } else if (!lines.empty()) {
-                    megamol::core::utility::log::Log::DefaultLog.WriteWarn(
-                        "  lines in column %d: %s", 1 + c, lines.c_str());
-                }
-            }
-        }
-
-        // Merge categorical data so that all `value indices` map to one `string key`
-        if (hasCatDims) {
-            for (size_t c = 0; c < colCnt; ++c) {
-                if (columns[c].Type() != TableDataCall::ColumnType::CATEGORICAL)
-                    continue;
-                std::map<int, int> catRemap;
-                std::map<std::string, int> catMap;
-                for (int ci = static_cast<int>(c) * thCnt; ci < static_cast<int>(c + 1) * thCnt; ++ci) {
-                    for (const std::pair<std::string, float>& p : catMaps[ci]) {
-                        int vi = static_cast<int>(p.second + 0.49f);
-                        std::map<std::string, int>::iterator cmi = catMap.find(p.first);
+                    if (this->columns[col].Type() == TableDataCall::ColumnType::QUANTITATIVE) {
+                        if (decType == DecimalSeparator::DE) {
+                            for (char* ez = const_cast<char*>(start); ez != end; ++ez)
+                                if (*ez == ',')
+                                    *ez = '.';
+                        }
+                        double value = parseValue(start, end);
+                        values[static_cast<size_t>(idx * colCnt + col)] = static_cast<float>(value);
+                        if (std::isnan(value)) {
+                            hasInvalids = true;
+                        }
+                    } else if (this->columns[col].Type() == TableDataCall::ColumnType::CATEGORICAL) {
+                        assert(hasCatDims);
+                        std::map<std::string, float>::iterator cmi = catMap.find(start);
                         if (cmi == catMap.end()) {
-                            int nv = static_cast<int>(catMap.size());
-                            catMap[p.first] = nv;
-                            catRemap[vi] = nv;
+                            cmi = catMap
+                                      .insert(std::pair<std::string, float>(
+                                          start, static_cast<float>(thId + thCnt * catMap.size())))
+                                      .first;
+                        }
+                        values[static_cast<size_t>(idx * colCnt + col)] = cmi->second;
+                    } else {
+                        assert(false);
+                    }
+
+                    col++;
+                    if (*end != '\0') {
+                        start = end + 1;
+                        end = start;
+                    }
+                }
+                for (; col < colCnt; ++col) {
+                    values[static_cast<size_t>(idx * colCnt + col)] = std::numeric_limits<float>::quiet_NaN();
+                    hasInvalids = true;
+                }
+            }
+
+            // Report invalid data if present (note: do not drop data!)
+            if (hasInvalids) {
+                megamol::core::utility::log::Log::DefaultLog.WriteWarn("CSV file contains invalid data:");
+                for (size_t c = 0; c < colCnt; ++c) {
+                    std::stringstream ss;
+                    bool invalidColumn = true;
+                    for (size_t r = 0; r < rowCnt; ++r) {
+                        float value = values[r * colCnt + c];
+                        if (std::isnan(value)) {
+                            size_t line = 1 + firstDatRow + r;
+                            ss << line << " ";
                         } else {
-                            catRemap[vi] = cmi->second;
+                            invalidColumn = false;
                         }
                     }
-                }
-
-                for (size_t r = 0; r < rowCnt; ++r) {
-                    int vi = static_cast<int>(values[r * colCnt + c] + 0.49f);
-                    values[r * colCnt + c] = static_cast<float>(catRemap[vi]);
+                    std::string lines = ss.str();
+                    if (invalidColumn) {
+                        megamol::core::utility::log::Log::DefaultLog.WriteWarn("  lines in column %d: all", 1 + c);
+                    } else if (!lines.empty()) {
+                        megamol::core::utility::log::Log::DefaultLog.WriteWarn(
+                            "  lines in column %d: %s", 1 + c, lines.c_str());
+                    }
                 }
             }
-        }
 
-        // Collect min/max
-        std::vector<float> minVals(colCnt, std::numeric_limits<float>::max());
-        std::vector<float> maxVals(colCnt, -std::numeric_limits<float>::max());
-        for (size_t r = 0; r < rowCnt; ++r) {
+            // Merge categorical data so that all `value indices` map to one `string key`
+            if (hasCatDims) {
+                for (size_t c = 0; c < colCnt; ++c) {
+                    if (columns[c].Type() != TableDataCall::ColumnType::CATEGORICAL)
+                        continue;
+                    std::map<int, int> catRemap;
+                    std::map<std::string, int> catMap;
+                    for (int ci = static_cast<int>(c) * thCnt; ci < static_cast<int>(c + 1) * thCnt; ++ci) {
+                        for (const std::pair<std::string, float>& p : catMaps[ci]) {
+                            int vi = static_cast<int>(p.second + 0.49f);
+                            std::map<std::string, int>::iterator cmi = catMap.find(p.first);
+                            if (cmi == catMap.end()) {
+                                int nv = static_cast<int>(catMap.size());
+                                catMap[p.first] = nv;
+                                catRemap[vi] = nv;
+                            } else {
+                                catRemap[vi] = cmi->second;
+                            }
+                        }
+                    }
+
+                    for (size_t r = 0; r < rowCnt; ++r) {
+                        int vi = static_cast<int>(values[r * colCnt + c] + 0.49f);
+                        values[r * colCnt + c] = static_cast<float>(catRemap[vi]);
+                    }
+                }
+            }
+
+            // Collect min/max
+            std::vector<float> minVals(colCnt, std::numeric_limits<float>::max());
+            std::vector<float> maxVals(colCnt, -std::numeric_limits<float>::max());
+            for (size_t r = 0; r < rowCnt; ++r) {
+                for (size_t c = 0; c < colCnt; ++c) {
+                    float f = values[r * colCnt + c];
+                    if (f < minVals[c])
+                        minVals[c] = f;
+                    if (f > maxVals[c])
+                        maxVals[c] = f;
+                }
+            }
             for (size_t c = 0; c < colCnt; ++c) {
-                float f = values[r * colCnt + c];
-                if (f < minVals[c])
-                    minVals[c] = f;
-                if (f > maxVals[c])
-                    maxVals[c] = f;
+                columns[c].SetMinimumValue(minVals[c]).SetMaximumValue(maxVals[c]);
             }
-        }
-        for (size_t c = 0; c < colCnt; ++c) {
-            columns[c].SetMinimumValue(minVals[c]).SetMaximumValue(maxVals[c]);
-        }
 
-        // 5. All done... report summary
-        //////////////////////////////////////////////////////////////////////
-        megamol::core::utility::log::Log::DefaultLog.WriteInfo("Tabular data loaded: %u dimensions; %u samples\n",
-            static_cast<unsigned int>(colCnt), static_cast<unsigned int>(rowCnt));
+            // 5. All done... report summary
+            //////////////////////////////////////////////////////////////////////
+            megamol::core::utility::log::Log::DefaultLog.WriteInfo("Tabular data loaded: %u dimensions; %u samples\n",
+                static_cast<unsigned int>(colCnt), static_cast<unsigned int>(rowCnt));
 
-    } catch (const vislib::Exception& ex) {
-        megamol::core::utility::log::Log::DefaultLog.WriteError("Could not load \"%s\": %s [%s, %d]",
-            filename.generic_u8string().c_str(), ex.GetMsgA(), ex.GetFile(), ex.GetLine());
-        this->columns.clear();
-        this->values.clear();
-    } catch (...) {
-        this->columns.clear();
-        this->values.clear();
+        } catch (const vislib::Exception& ex) {
+            megamol::core::utility::log::Log::DefaultLog.WriteError("Could not load \"%s\": %s [%s, %d]",
+                filename.generic_u8string().c_str(), ex.GetMsgA(), ex.GetFile(), ex.GetLine());
+            this->columns.clear();
+            this->values.clear();
+        } catch (...) {
+            this->columns.clear();
+            this->values.clear();
+        }
     }
-
     shuffleData();
 
     this->dataHash++;
