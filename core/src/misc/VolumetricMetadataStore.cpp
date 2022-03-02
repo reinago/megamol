@@ -9,6 +9,7 @@
 #include "mmcore/misc/VolumetricMetadataStore.h"
 
 #include <cassert>
+#include <iterator>
 
 
 /*
