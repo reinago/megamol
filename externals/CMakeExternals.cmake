@@ -1000,6 +1000,31 @@ function(require_external NAME)
       PROJECT vtkm
       LIBRARY ${VTKM_WORKLET_LIB})
 
+  # xxHash
+  elseif (NAME STREQUAL "xxhash")
+    if (TARGET xxhash)
+      return()
+    endif ()
+
+    if (WIN32)
+      set(XXHASH_LIB "lib/xxhash.lib")
+    else ()
+      set(XXHASH_LIB "${CMAKE_INSTALL_LIBDIR}/libxxhash.a")
+    endif ()
+
+    add_external_project(xxhash STATIC
+      GIT_REPOSITORY https://github.com/Cyan4973/xxHash.git
+      GIT_TAG v0.8.1
+      SOURCE_SUBDIR cmake_unofficial
+      BUILD_BYPRODUCTS "<INSTALL_DIR>/${XXHASH_LIB}"
+      CMAKE_ARGS
+        -DXXHASH_BUILD_XXHSUM=OFF
+        -DBUILD_SHARED_LIBS=OFF
+    )
+    add_external_library(xxhash
+      LIBRARY ${XXHASH_LIB}
+    )
+
   # zfp
   elseif (NAME STREQUAL "zfp")
     if (TARGET zfp)

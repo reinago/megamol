@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include <xxhash.h>
+
 #include "FrontendResource.h"
 #include "FrontendResourcesMap.h"
 
