@@ -159,6 +159,12 @@ public:
         return this->created;
     }
 
+    bool AnyParameterDirty() const;
+
+    void ResetAllDirtyFlags();
+
+    XXH64_hash_t GetParamHash();
+
 protected:
     /**
      * Implementation of 'Create'.
@@ -213,6 +219,8 @@ private:
     bool created;
 
     const char* className;
+
+    XXH64_hash_t lastParamHash = 0;
 
     /* Allow the container to access the internal create flag */
     friend class ::megamol::core::AbstractNamedObjectContainer;

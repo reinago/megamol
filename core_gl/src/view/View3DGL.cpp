@@ -14,6 +14,8 @@
 #include "mmcore/param/FloatParam.h"
 #include "mmcore_gl/view/CallRender3DGL.h"
 #include "mmcore_gl/view/CallRenderViewGL.h"
+#include "PerformanceManager.h"
+#include "../../../frontend/services/profiling_service/Profiling_Service.hpp"
 
 using namespace megamol::core_gl;
 using namespace megamol::core_gl::view;
@@ -74,6 +76,19 @@ megamol::frontend_resources::ImageWrapper View3DGL::Render(double time, double i
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     CallRender3DGL* cr3d = this->_rhsRenderSlot.CallAs<CallRender3DGL>();
+
+    static XXH64_hash_t h;
+    const auto start = frontend_resources::PerformanceManager::time_point::clock::now();
+    const auto new_hash = GetParamHash();
+    const auto end = frontend_resources::PerformanceManager::time_point::clock::now();
+    const bool hash_changed = h != new_hash;
+    // cannot do that if the modules do not manage the dirtyness. because like dirt, it sticks.
+    //assert(h == 0 || hash_changed == AnyParameterDirty());
+    h = new_hash;
+    if (hash_changed) {
+        const auto ms = std::chrono::duration<double, std::milli>(end - start);
+        Log::DefaultLog.WriteInfo("hashing Parameters took %lf ms", ms.count());
+    }
 
     if (cr3d != NULL) {
         // set camera and fbo in rendering call

@@ -173,6 +173,57 @@ void Module::PerformCleanup(void) {
 }
 
 
+bool Module::AnyParameterDirty() const {
+    auto ret = false;
+    for (auto it = ChildList_Begin(); it != ChildList_End(); ++it) {
+        if (const auto paramSlot = dynamic_cast<param::ParamSlot*>((*it).get())) {
+            ret = ret || paramSlot->IsDirty();
+        }
+    }
+    return ret;
+}
+
+void Module::ResetAllDirtyFlags() {
+    for (auto it = ChildList_Begin(); it != ChildList_End(); ++it) {
+        if (const auto paramSlot = dynamic_cast<param::ParamSlot*>((*it).get())) {
+            paramSlot->ResetDirty();
+        }
+    }
+}
+
+XXH64_hash_t Module::GetParamHash() {
+    // this is not a good idea. some modules don't care and never reset the dirtyness, so we end up computing the hash over and over
+    if (AnyParameterDirty()) {
+        const auto state = XXH3_createState();
+        bool OK = true;
+        if (state != nullptr) {
+            if (XXH3_64bits_reset(state) != XXH_ERROR) {
+                for (auto it = ChildList_Begin(); it != ChildList_End(); ++it) {
+                    if (const auto paramSlot = dynamic_cast<param::ParamSlot*>((*it).get())) {
+                        auto str = paramSlot->Param<param::AbstractParam>()->ValueString();
+                        Log::DefaultLog.WriteInfo("%s", str.c_str());
+                        if (XXH3_64bits_update(state, str.c_str(), str.length()) == XXH_ERROR) {
+                            OK = false;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                OK = false;
+            }
+        } else {
+            OK = false;
+        }
+        if (OK) {
+            lastParamHash = XXH3_64bits_digest(state);
+        } else {
+            lastParamHash = 0;
+        }
+    }
+    return lastParamHash;
+}
+
+
 /*
  * Module::getRelevantConfigValue
  */
