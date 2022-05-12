@@ -201,7 +201,7 @@ XXH64_hash_t Module::GetParamHash() {
                 for (auto it = ChildList_Begin(); it != ChildList_End(); ++it) {
                     if (const auto paramSlot = dynamic_cast<param::ParamSlot*>((*it).get())) {
                         auto str = paramSlot->Param<param::AbstractParam>()->ValueString();
-                        Log::DefaultLog.WriteInfo("%s", str.c_str());
+                        //Log::DefaultLog.WriteInfo("%s", str.c_str());
                         if (XXH3_64bits_update(state, str.c_str(), str.length()) == XXH_ERROR) {
                             OK = false;
                             break;
