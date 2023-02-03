@@ -7,8 +7,12 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+#include <deque>
 
 #include <glowl/glowl.h>
+
+#include <nlohmann/json.hpp>
 
 #include "mmcore/CalleeSlot.h"
 #include "mmcore/CallerSlot.h"
@@ -16,15 +20,33 @@
 #include "mmstd/renderer/RendererModule.h"
 #include "mmstd_gl/ModuleGL.h"
 #include "mmstd_gl/renderer/CallRender3DGL.h"
+#include "mmstd_gl/renderer/Renderer3DModuleGL.h"
+#include "mmcore/utility/Picking.h"
+#include "ScriptPaths.h"
+
+// struct annotation_struct with glm::vec3 coordinates, std::string annotation, std::string name, bool show_window
+struct annotation_struct {
+    // Annotation of the current point
+    std::string annotation;
+    // Coordinates of the current point
+    glm::vec3 coordinates;
+    // Name of the current point
+    std::string name;
+    // Bool for showing the current point in a window
+    bool show_window;
+};
+// TODO: additions: - Timestamp of start and end
+
 
 namespace megamol::annotation {
 
 /**
- * Renderer responsible for the rendering of the currently active bounding box as well as the view cube etc.
+ * Renderer responsible for the rendering the currently active Annotations
  * This is a special renderer without the typical structure of other renderers, since it does not inherit from
  * mmstd_gl::Renderer3Dmegamol::mmstd_gl::ModuleGL.
  */
-class AnnotationRenderer : public core::view::RendererModule<megamol::mmstd_gl::CallRender3DGL, megamol::mmstd_gl::ModuleGL> {
+class AnnotationRenderer : public megamol::mmstd_gl::Renderer3DModuleGL {
+    //core::view::RendererModule<megamol::mmstd_gl::CallRender3DGL, megamol::mmstd_gl::ModuleGL> {
 public:
     /**
      * Answer the name of this module.
@@ -41,7 +63,7 @@ public:
      * @return A human readable description of this module.
      */
     static const char* Description() {
-        return "Renders the incoming bounding box as well as the view cube etc.";
+        return "Renders Annotation Boxes for the current data."; // TODO Need to change this description when it changes.
     }
 
     /**
@@ -59,6 +81,15 @@ public:
     /** Dtor. */
     ~AnnotationRenderer() override;
 
+    bool OnMouseButton(megamol::core::view::MouseButton button, megamol::core::view::MouseButtonAction action,
+        megamol::core::view::Modifiers mods) override;
+
+    std::vector<std::string> requested_lifetime_resources() override {
+        std::vector<std::string> resources = megamol::mmstd_gl::Renderer3DModuleGL::requested_lifetime_resources();
+        resources.emplace_back("LuaScriptPaths");
+        return resources;
+    }
+    
 protected:
     /**
      * Implementation of 'Create'.
@@ -82,60 +113,15 @@ private:
     bool GetExtents(megamol::mmstd_gl::CallRender3DGL& call) override;
 
     /*
-     * Renders the bounding box and the viewcube on top of the other rendered things
+     * Renders the Annotation windows
      *
      * @param call The call containing the camera and other parameters
      * @return True on success, false otherwise
      */
     bool Render(megamol::mmstd_gl::CallRender3DGL& call) final;
 
-    /**
-     * Render function for the bounding box front
-     *
-     * @param call The used mvp matrix
-     * @param bb The bounding box to render
-     * @param smoothLines Determines whether the lines of the box should get smoothed. default = true
-     * @return True on success, false otherwise.
-     */
-    //bool RenderBoundingBoxFront(const glm::mat4& mvp, const core::BoundingBoxes_2& bb, bool smoothLines = true);
-
-    /**
-     * Render function for the bounding box back
-     *
-     * @param mvp Model, view and projection matrices combined
-     * @param bb The bounding box to render
-     * @param smoothLines Determines whether the lines of the box should get smoothed. default = true
-     * @return True on success, false otherwise.
-     */
-    //bool RenderBoundingBoxBack(const glm::mat4& mvp, const core::BoundingBoxes_2& bb, bool smoothLines = true);
-
-    /**
-     * Render function for the view cube
-     *
-     * @param call The call containing the camera and other parameters
-     * @return True on success, false otherwise.
-     */
-    //bool RenderViewCube(megamol::mmstd_gl::CallRender3DGL& call);
-
-    /** Parameter that enables or disables the bounding box rendering */
-    //core::param::ParamSlot enableBoundingBoxSlot;
-
+    /** Parameter that enables or disables the Annotation Renderer */
     core::param::ParamSlot enableAnnotationRendererSlot;
-
-    /** Parameter storing the desired color of the bounding box */
-    //core::param::ParamSlot boundingBoxColorSlot;
-
-    /** Parameter enabling or disabling the smoothing of lines */
-    //core::param::ParamSlot smoothLineSlot;
-
-    /** Parameter that enables or disables the view cube rendering */
-    //core::param::ParamSlot enableViewCubeSlot;
-
-    /** Parameter for setting the position of the view cube */
-    //core::param::ParamSlot viewCubePosSlot;
-
-    /** Parameter for setting the view cube size */
-    //core::param::ParamSlot viewCubeSizeSlot;
 
     /** Handle of the vertex buffer object */
     GLuint vbo;
@@ -149,18 +135,100 @@ private:
     /** Shader program for lines */
     std::unique_ptr<glowl::GLSLProgram> lineShader;
 
-    /** Shader program for a cube */
-    std::unique_ptr<glowl::GLSLProgram> cubeShader;
-
     /** Bounding Boxes */
     megamol::core::BoundingBoxes_2 boundingBoxes;
 
     /* Test function for checking out how ImGUI behaves */
-    void test();
+    void test(megamol::mmstd_gl::CallRender3DGL& call);
+
+
+
+    /** The simple shader for the drawing of GL_POINTS */
+    std::unique_ptr<glowl::GLSLProgram> simpleShader;
+
+    /** The pretty shader that draws spheres*/
+    std::unique_ptr<glowl::GLSLProgram> sphereShader;
+
+
+    void print_coords(glm::vec3 coords);
+
+    void showSphereAtPoint(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords);
+
+    void showAnotherWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name, bool& window_open);
+
+    void save_new_point_to_json(glm::vec3 coords, std::string annotation, std::string point_name);
+
+    void display_json_window(megamol::mmstd_gl::CallRender3DGL& call);
+
+    void write_json_obj_data_to_vectors(bool loaded_from_file = false);
+
+    void load_selected_json_point(
+        megamol::mmstd_gl::CallRender3DGL& call, std::string windowName, bool& window_open, int curr_index);
+
+    void update_point_in_json(glm::vec3 coords, std::string annotation, int point_index);
+
+    // void warning_popup(std::string warning_message);
+    void warning_popup();
+
+    void load_json_from_file();
+
+    /* Calculate the coordinates for a given clicked */
+    glm::vec3 calcClickedPoint(int x, int y, megamol::mmstd_gl::CallRender3DGL& call);
+
+    std::string determineJsonFilePath() const;
+
+
+    /* Parameters */
+    /** Slot for the scaling factor of the pointsize*/
+    core::param::ParamSlot sizeScalingSlot;
+
+    core::param::ParamSlot linesColorSlot;
+
+    // gives the depth buffer to the renderer
+    // megamol::core::CallerSlot get_depth_buffer;
+
+
+    /*
+    VARIABLES
+    */
+    /** Picking Variables */
+    megamol::core::utility::PickingBuffer picking_buffer;
 
     /** ImGUI Variables */
-    float f;
-    char buf;
+    float my_color;
+    float first_win_coordinates_input[3];
+    float first_win_color_input[3];
+    glm::vec3 first_win_color;
+
+    bool tryOut;
+
+    bool anotherWindow;
+
+    bool show_json_window;
+
+    /* ImGui Second Window Variables */
+    float second_win_coordinates_input[3];
+    std::string second_win_annotation_input;
+    float second_win_color_input[3];
+    glm::vec3 second_win_color;
+    bool show_second_win_point;
+    std::string second_win_point_name_input;
+
+
+    bool warning_popup_bool;
+
+    bool grh;
+
+    std::vector<annotation_struct> all_annotations;
+
+
+    /* json Variables */
+
+    nlohmann::json json_obj;
+    int json_amount;
+    std::string json_file_path;
+
+    int json_point_name_selectedIndex;
 
 };
-} // namespace megamol::mmstd_gl
+} // namespace megamol::annotation
