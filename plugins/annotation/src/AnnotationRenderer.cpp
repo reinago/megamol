@@ -121,15 +121,12 @@ bool AnnotationRenderer::OnMouseButton(megamol::core::view::MouseButton button,
     }
 
     if (action == core::view::MouseButtonAction::PRESS) {
-        // Only try to add a point, if a button is being pressed with no additional modifiers
-        if (mods.test(core::view::Modifier::NONE)) {
-            printf("Hey you pressed a button\n");
-            printf("x: %f, y: %f \n", this->lastX, this->lastY);
+        printf("Hey you pressed a button\n");
+        printf("x: %f, y: %f \n", this->lastX, this->lastY);
 
-            // If picking is enabled then we set the boolean picked_a_point to true, so the other functions can calculate the coordinates with the current mouse position.
-            if (picking_enabled) {
-                picked_a_point = true;
-            }
+        // If picking is enabled then we set the boolean picked_a_point to true, so the other functions can calculate the coordinates with the current mouse position.
+        if (picking_enabled) {
+            picked_a_point = true;
         }
     }
 
