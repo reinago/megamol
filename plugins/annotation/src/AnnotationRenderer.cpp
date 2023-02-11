@@ -626,10 +626,16 @@ void AnnotationRenderer::warning_popup() {
 
 
 void AnnotationRenderer::load_json_from_file() {
-    // TODO: EXCEPTION when trying to load a non-existing file!!!!
     // TODO: change the path to the path of the json file
     // std::ifstream i("C:\\Dateien\\megamol\\pretty.json");
-    std::ifstream i(determineJsonFilePath());
+    std::string file_path = determineJsonFilePath();
+    if (file_path.empty()) {
+        // TODO: Add warning message that there is no file to be loaded!
+        // this is just a warning message on the console that is not nessecerily something for the "regular" user
+        std::cout << "There is no file to be loaded" << std::endl;
+        return;
+    }
+    std::ifstream i(file_path);
     i >> json_obj;
     // TODO: this line is ONLY for debugging...
     if (IsDebuggerPresent)
