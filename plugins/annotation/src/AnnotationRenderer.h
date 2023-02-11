@@ -21,7 +21,6 @@
 #include "mmstd_gl/ModuleGL.h"
 #include "mmstd_gl/renderer/CallRender3DGL.h"
 #include "mmstd_gl/renderer/Renderer3DModuleGL.h"
-#include "mmcore/utility/Picking.h"
 #include "ScriptPaths.h"
 
 // struct annotation_struct with glm::vec3 coordinates, std::string annotation, std::string name, bool show_window
@@ -83,6 +82,8 @@ public:
 
     bool OnMouseButton(megamol::core::view::MouseButton button, megamol::core::view::MouseButtonAction action,
         megamol::core::view::Modifiers mods) override;
+
+    bool OnMouseMove(double x, double y) override;
 
     std::vector<std::string> requested_lifetime_resources() override {
         std::vector<std::string> resources = megamol::mmstd_gl::Renderer3DModuleGL::requested_lifetime_resources();
@@ -154,7 +155,7 @@ private:
 
     void showSphereAtPoint(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords);
 
-    void showAnotherWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name, bool& window_open);
+    void showAddingAnotationWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name, bool& window_open);
 
     void save_new_point_to_json(glm::vec3 coords, std::string annotation, std::string point_name);
 
@@ -192,8 +193,12 @@ private:
     VARIABLES
     */
     /** Picking Variables */
-    megamol::core::utility::PickingBuffer picking_buffer;
+    bool picking_enabled;
+    bool picked_a_point;
 
+    /** Last mouse position (for deprecation mapping) */
+    float lastX, lastY;
+    
     /** ImGUI Variables */
     float my_color;
     float first_win_coordinates_input[3];
@@ -207,12 +212,12 @@ private:
     bool show_json_window;
 
     /* ImGui Second Window Variables */
-    float second_win_coordinates_input[3];
-    std::string second_win_annotation_input;
-    float second_win_color_input[3];
-    glm::vec3 second_win_color;
-    bool show_second_win_point;
-    std::string second_win_point_name_input;
+    float annot_win_coordinates_input[3];
+    std::string annot_win_annotation_input;
+    float annot_win_color_input[3];
+    glm::vec3 annot_win_color;
+    bool show_annot_win_point;
+    std::string annot_win_point_name_input;
 
 
     bool warning_popup_bool;

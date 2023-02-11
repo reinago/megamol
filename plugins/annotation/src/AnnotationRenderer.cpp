@@ -15,10 +15,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-/* Needed for Json */
-#include <nlohmann/json.hpp>
+#include <nlohmann/json.hpp> // Needed for Json
 #include <fstream>
-
 
 #include "mmcore/CoreInstance.h"
 #include "mmcore/param/BoolParam.h"
@@ -28,8 +26,6 @@
 #include "mmcore/param/IntParam.h"
 #include "mmcore/utility/log/Log.h"
 #include "mmcore_gl/utility/ShaderFactory.h"
-
-#include "mmcore/utility/Picking.h"
 
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -56,19 +52,22 @@ AnnotationRenderer::AnnotationRenderer()
         , ibo(0)
         , va(0)
         , boundingBoxes()
-        , picking_buffer()
+        , picking_enabled(false)
+        , picked_a_point(false)
+        , lastX()
+        , lastY()
         , my_color()
         , first_win_coordinates_input()
         , first_win_color_input()
         , first_win_color()
         , tryOut(false)
         , anotherWindow(false)
-        , second_win_coordinates_input()
-        , second_win_annotation_input()
-        , second_win_color_input()
-        , second_win_color()
-        , second_win_point_name_input()
-        , show_second_win_point(false)
+        , annot_win_coordinates_input()
+        , annot_win_annotation_input()
+        , annot_win_color_input()
+        , annot_win_color()
+        , annot_win_point_name_input()
+        , show_annot_win_point(false)
         , warning_popup_bool(false)
         , show_json_window(false)
         , json_file_path()
@@ -97,19 +96,43 @@ AnnotationRenderer::~AnnotationRenderer() {
     this->Release();
 }
 
-//bool PickingBuffer::ProcessMouseClick(megamol::core::view::MouseButton button,
-//    megamol::core::view::MouseButtonAction action, megamol::core::view::Modifiers mods) {
-//
-//    RendererModule::OnMouseButton(button, action, mods);
-//    this->picking_buffer.ProcessMouseClick(button, action, mods);
-//    return false;
-//}
+/*
+* Saves the mouse coordinates after the last move.
+*/
+bool AnnotationRenderer::OnMouseMove(double x, double y) {
+    // IMPORTANT: the x, y from this function count from the TOP left of the screen
+    // the x,y in the framebuffer are counted from the BOTTOM left of the screen
+    RendererModule::OnMouseMove(x, y);
+    this->lastX = x;
+    this->lastY = y;
+    // printf("lastX: %f, lastY: %f", this->lastX, this->lastY);
+    return false;
+}
 
+/*
+ * Runs when a mouse button is clicked.
+ * On left mouse click with no modifieres it will set a flag for saving the current coordinates of the cursor.
+ */
 bool AnnotationRenderer::OnMouseButton(megamol::core::view::MouseButton button,
     megamol::core::view::MouseButtonAction action, megamol::core::view::Modifiers mods) {
+    // Only continue if a Left Mouse Button press is detected
+    if (button != core::view::MouseButton::BUTTON_LEFT) {
+        return false;
+    }
 
-    RendererModule::OnMouseButton(button, action, mods);
-    this->picking_buffer.ProcessMouseClick(button, action, mods);
+    if (action == core::view::MouseButtonAction::PRESS) {
+        // Only try to add a point, if a button is being pressed with no additional modifiers
+        if (mods.test(core::view::Modifier::NONE)) {
+            printf("Hey you pressed a button\n");
+            printf("x: %f, y: %f \n", this->lastX, this->lastY);
+
+            // If picking is enabled then we set the boolean picked_a_point to true, so the other functions can calculate the coordinates with the current mouse position.
+            if (picking_enabled) {
+                picked_a_point = true;
+            }
+        }
+    }
+
     return false;
 }
 
@@ -242,6 +265,10 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
     return renderRes;
 }
 
+/*
+* Main function.
+* This function generates the main ImGui window and allows the opening of all other windows.
+*/
 void AnnotationRenderer::test(CallRender3DGL &call) {
     bool valid_imgui_scope =
         ((ImGui::GetCurrentContext() != nullptr) ? (ImGui::GetCurrentContext()->WithinFrameScope) : (false));
@@ -284,7 +311,7 @@ void AnnotationRenderer::test(CallRender3DGL &call) {
     }
 
     if (anotherWindow) {
-        showAnotherWindow(call, "Second Window", this->anotherWindow);
+        showAddingAnotationWindow(call, "Second Window", this->anotherWindow);
     }
 
     if (show_json_window) {
@@ -297,7 +324,10 @@ void AnnotationRenderer::test(CallRender3DGL &call) {
     ImGui::End();
 }
 
-void AnnotationRenderer::showAnotherWindow(CallRender3DGL& call, std::string window_name, bool &window_open) {
+/*
+* Function for the ImGui window that allows the adding of a new point.
+*/
+void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::string window_name, bool &window_open) {
     // Is this needed here as well?
     bool valid_imgui_scope =
         ((ImGui::GetCurrentContext() != nullptr) ? (ImGui::GetCurrentContext()->WithinFrameScope) : (false));
@@ -305,32 +335,57 @@ void AnnotationRenderer::showAnotherWindow(CallRender3DGL& call, std::string win
         return;
 
     ImGui::Begin(window_name.c_str(), &window_open);
-    ImGui::InputText("Point Name", &this->second_win_point_name_input);
+    ImGui::InputText("Point Name", &this->annot_win_point_name_input);
     ImGui::Text("Write your annotations here:");
-    ImGui::InputText("Annotation", &this->second_win_annotation_input);
-    ImGui::Text(this->second_win_annotation_input.c_str()); // TODO: Allow \n or similar functions to work!
-    ImGui::InputFloat3("input coordinates", this->second_win_coordinates_input);
+    ImGui::InputText("Annotation", &this->annot_win_annotation_input);
+    ImGui::Text(this->annot_win_annotation_input.c_str()); // TODO: Allow \n or similar functions to work!
+    ImGui::InputFloat3("input coordinates", this->annot_win_coordinates_input);
 
     // save inputs in local variables
-    glm::vec3 second_win_coordinates =
-        glm::vec3(second_win_coordinates_input[0], second_win_coordinates_input[1], second_win_coordinates_input[2]);
-    std::string second_win_annotation = second_win_annotation_input;
-    std::string second_win_point_name = second_win_point_name_input;
+    glm::vec3 annot_win_coordinates = glm::vec3(this->annot_win_coordinates_input[0],
+        this->annot_win_coordinates_input[1], this->annot_win_coordinates_input[2]);
+    std::string annot_win_point_name = this->annot_win_point_name_input;
+    std::string annot_win_annotation = this->annot_win_annotation_input;
 
+    // Button for starting the picking process
+    if (ImGui::Button("Click in the viewport to add a new point")) {
+        this->picking_enabled = true;
+    }
+
+    if (this->picking_enabled) {
+        ImGui::Text("Click in the viewport to add a new point");
+        // Wait till the user has clicked in the Window and then calculate the coordinates from this point.
+        // this uses the variables lastX and lastY that are updated everytime the mouse is moved.
+        if (this->picked_a_point) {
+            glm::vec3 picked_point = calcClickedPoint(this->lastX, this->lastY, call);
+            // are these texts even needed? because they will just vanish after 1 frame
+            ImGui::Text("Picked a point!");
+            ImGui::Text("x: %f, y: %f, z: %f", picked_point.x, picked_point.y, picked_point.z);
+            annot_win_coordinates = picked_point;
+            // this conversion is needed to show the coordinates in the ImGui window
+            this->annot_win_coordinates_input[0] = picked_point.x;
+            this->annot_win_coordinates_input[1] = picked_point.y;
+            this->annot_win_coordinates_input[2] = picked_point.z;
+            this->picked_a_point = false;
+            this->picking_enabled = false;
+        }
+    }
+
+    
     if (ImGui::Button("Toggle Sphere")) {
-        if (this->show_second_win_point) {
-            this->show_second_win_point = false;
+        if (this->show_annot_win_point) {
+            this->show_annot_win_point = false;
         } else {
-            this->show_second_win_point = true;
+            this->show_annot_win_point = true;
         }
     }
 
     if (ImGui::Button("Save current coords and Annotation")) {
-        save_new_point_to_json(second_win_coordinates, second_win_annotation, second_win_point_name);
+        save_new_point_to_json(annot_win_coordinates, annot_win_annotation, annot_win_point_name);
     }
 
-    if (this->show_second_win_point) {
-        showSphereAtPoint(call, second_win_coordinates);
+    if (this->show_annot_win_point) {
+        showSphereAtPoint(call, annot_win_coordinates);
     }
     ImGui::End();
 }
@@ -344,6 +399,7 @@ void AnnotationRenderer::print_coords(glm::vec3 coords) {
 
 /* Draw a sphere at the coordinates given in the vec3 */
 void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coords) {
+    // TODO: currently the sphere is ALWAYS in the front? (even when it SHOULD be behind other objects)
     core::view::Camera cam = call.GetCamera();
     auto view = cam.getViewMatrix();
     auto proj = cam.getProjectionMatrix();
@@ -353,7 +409,7 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     auto colptr = this->linesColorSlot.Param<core::param::ColorParam>()->Value();
 
     glm::vec3 current = coords;
-
+    glEnable(GL_DEPTH_TEST);
     /* This enables the use of a Renderer for the generated point at the given coordinates that will stay there no matter the direction of the camera */
     this->sphereShader->use();
 
@@ -428,7 +484,7 @@ void AnnotationRenderer::update_point_in_json(glm::vec3 coords, std::string anno
 void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
     ImGui::Begin("test", &this->show_json_window);
     // this->anotherWindow = true;
-    // showAnotherWindow(call, "Second Window", this->show_json_window);
+    // showAddingAnotationWindow(call, "Second Window", this->show_json_window);
     ImGui::Text("WARNING: Importing a file WILL overvrite everything you currently have!");
     if (ImGui::Button("Load json from file")) {
         // TODO: add popup
@@ -570,6 +626,7 @@ void AnnotationRenderer::warning_popup() {
 
 
 void AnnotationRenderer::load_json_from_file() {
+    // TODO: EXCEPTION when trying to load a non-existing file!!!!
     // TODO: change the path to the path of the json file
     // std::ifstream i("C:\\Dateien\\megamol\\pretty.json");
     std::ifstream i(determineJsonFilePath());
@@ -617,21 +674,30 @@ std::string AnnotationRenderer::determineJsonFilePath(void) const {
  * The value at this index is then returned.
  */
 glm::vec3 AnnotationRenderer::calcClickedPoint(int x, int y, CallRender3DGL& call) {
+    // TODO: (what to do if there are holes in the data?)
+    // IMPORTANT: the input x,y are counted from the TOP left corner of the screen, NOT from the bottom left corner!
+
+    auto const lhsFBO = call.GetFramebuffer();
+    // flip the y coordinates with getHeight from the Framebuffer
+    y = lhsFBO->getHeight() - y;
     int dataSize = 1 * 1;
     float* data = new float[dataSize];
     glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, data); // change 1,1 if bigger area is needed
     float depth = data[0];
     delete[] data;
+    
     core::view::Camera cam = call.GetCamera();
-    auto const lhsFBO = call.GetFramebuffer();
     auto view = cam.getViewMatrix();
     auto proj = cam.getProjectionMatrix();
     auto mvp = proj * view;
     auto invMVP = glm::inverse(mvp);
-    float trararara = 2 * depth - 1;
-    float nx = (2 * (x / lhsFBO->getWidth())) - 1; //Einheitswürfel
-    float ny = (2 * (y / lhsFBO->getHeight())) - 1;
-    glm::vec4 h = invMVP * glm::vec4(nx, ny, trararara, 1.0);
+
+    float nDepth = 2 * depth - 1;
+    // conversion/ casting to float needed for division
+    float nx = (2 * ((float)x / lhsFBO->getWidth())) - 1; //Einheitswürfel
+    float ny = (2 * ((float)y / lhsFBO->getHeight())) - 1;
+    
+    glm::vec4 h = invMVP * glm::vec4(nx, ny, nDepth, 1.0);
     glm::vec3 result = glm::vec3(h)/h.w;
     return result;
 }
