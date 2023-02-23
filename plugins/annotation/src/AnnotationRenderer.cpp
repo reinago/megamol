@@ -62,12 +62,7 @@ AnnotationRenderer::AnnotationRenderer()
         , first_win_color()
         , tryOut(false)
         , anotherWindow(false)
-        , annot_win_coordinates_input()
-        , annot_win_annotation_input()
-        , annot_win_color_input()
-        , annot_win_color()
-        , annot_win_point_name_input()
-        , show_annot_win_point(false)
+        , annot_win_struct()
         , warning_popup_bool(false)
         , show_json_window(false)
         , json_file_path()
@@ -303,8 +298,7 @@ void AnnotationRenderer::test(CallRender3DGL &call) {
 
     // Save the current state of the json_obj to a json file
     if (ImGui::Button("Save annotations to Json File")) {
-        std::ofstream o(determineJsonFilePath());
-        o << std::setw(4) << json_obj << std::endl;
+        save_json_to_file();
     }
 
     if (anotherWindow) {
@@ -332,17 +326,17 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         return;
 
     ImGui::Begin(window_name.c_str(), &window_open);
-    ImGui::InputText("Point Name", &this->annot_win_point_name_input);
+    ImGui::InputText("Point Name", &this->annot_win_struct.point_name_input);
     ImGui::Text("Write your annotations here:");
-    ImGui::InputText("Annotation", &this->annot_win_annotation_input);
-    ImGui::Text(this->annot_win_annotation_input.c_str()); // TODO: Allow \n or similar functions to work!
-    ImGui::InputFloat3("input coordinates", this->annot_win_coordinates_input);
+    ImGui::InputText("Annotation", &this->annot_win_struct.annotation_input);
+    ImGui::Text(this->annot_win_struct.annotation_input.c_str()); // TODO: Allow \n or similar functions to work!
+    ImGui::InputFloat3("input coordinates", this->annot_win_struct.coordinates_input);
 
-    // save inputs in local variables
-    glm::vec3 annot_win_coordinates = glm::vec3(this->annot_win_coordinates_input[0],
-        this->annot_win_coordinates_input[1], this->annot_win_coordinates_input[2]);
-    std::string annot_win_point_name = this->annot_win_point_name_input;
-    std::string annot_win_annotation = this->annot_win_annotation_input;
+    // save inputs in global struct variable annot_win_struct
+    this->annot_win_struct.annot_struct.coordinates = glm::vec3(this->annot_win_struct.coordinates_input[0],
+        this->annot_win_struct.coordinates_input[1], this->annot_win_struct.coordinates_input[2]);
+    this->annot_win_struct.annot_struct.name = this->annot_win_struct.point_name_input;
+    this->annot_win_struct.annot_struct.annotation = this->annot_win_struct.annotation_input;
 
     // Button for starting the picking process
     if (ImGui::Button("Click in the viewport to add a new point")) {
@@ -358,11 +352,11 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
             // are these texts even needed? because they will just vanish after 1 frame
             ImGui::Text("Picked a point!");
             ImGui::Text("x: %f, y: %f, z: %f", picked_point.x, picked_point.y, picked_point.z);
-            annot_win_coordinates = picked_point;
+            this->annot_win_struct.annot_struct.coordinates = picked_point;
             // this conversion is needed to show the coordinates in the ImGui window
-            this->annot_win_coordinates_input[0] = picked_point.x;
-            this->annot_win_coordinates_input[1] = picked_point.y;
-            this->annot_win_coordinates_input[2] = picked_point.z;
+            this->annot_win_struct.coordinates_input[0] = picked_point.x;
+            this->annot_win_struct.coordinates_input[1] = picked_point.y;
+            this->annot_win_struct.coordinates_input[2] = picked_point.z;
             this->picked_a_point = false;
             this->picking_enabled = false;
         }
@@ -370,19 +364,27 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
 
     
     if (ImGui::Button("Toggle Sphere")) {
-        if (this->show_annot_win_point) {
-            this->show_annot_win_point = false;
+        if (this->annot_win_struct.show_point) {
+            this->annot_win_struct.show_point = false;
         } else {
-            this->show_annot_win_point = true;
+            this->annot_win_struct.show_point = true;
         }
     }
 
+    ImGui::Text("Save your Timestamps here:");
+    if (ImGui::Button("Start")) {
+        this->annot_win_struct.annot_struct.start_ts = call.Time();
+    }
+    if (ImGui::Button("End")) {
+        this->annot_win_struct.annot_struct.end_ts = call.Time();
+    }
     if (ImGui::Button("Save current coords and Annotation")) {
-        save_new_point_to_json(annot_win_coordinates, annot_win_annotation, annot_win_point_name);
+        // TODO: CLEAR all inputs of the imgui variables in this window after saving the new point (to prevent dupplications etc)?
+        save_new_point_to_json(this->annot_win_struct.annot_struct);
     }
 
-    if (this->show_annot_win_point) {
-        showSphereAtPoint(call, annot_win_coordinates);
+    if (this->annot_win_struct.show_point) {
+        showSphereAtPoint(call, this->annot_win_struct.annot_struct.coordinates);
     }
     ImGui::End();
 }
@@ -447,7 +449,7 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
 }
 
 /* Function to write the current coordinates and annotation to a json file */
-void AnnotationRenderer::save_new_point_to_json(glm::vec3 coords, std::string annotation, std::string point_name) {
+void AnnotationRenderer::save_new_point_to_json(annotation_struct input) {
     // TODO: add saving of color?
 
     // update the amount of points with annotations
@@ -455,16 +457,20 @@ void AnnotationRenderer::save_new_point_to_json(glm::vec3 coords, std::string an
 
     // save the current point and annotation
     json_obj["Points"][json_amount - 1] = {
-        {"Coordinates", {coords.x, coords.y, coords.z}},
-        {"Annotation", annotation},
+        {"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
+        {"Annotation", input.annotation},
         {"Point Number", json_amount},// to be able to get the correct number of the point again later TODO: is this really needed?
-        {"Point Name", point_name},
-        {"Show Window", false}
+        {"Point Name", input.name},
+        {"Show Window", false},
+        {"Start Timestamp", input.start_ts},
+        {"End Timestamp", input.end_ts}
     };
 
     // TODO: maybe save the json every time this function is called
     // TODO: In case of saving every time a new entry was made, maybe add a _temp file that is deleted after the user saves to the real file
-    // TODO: write json to vectors every time a new entry was made?
+    // write json to vectors every time a new entry was made?
+    // TODO: Calling write to vector CLOSES ALL opened windows!!!!!!
+    write_json_obj_data_to_vectors(false);
     std::cout << json_obj.dump(4) << std::endl;
 }
 
@@ -528,7 +534,7 @@ void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
 
     for (int index = 0; index < all_annotations.size(); ++index) {
         if (all_annotations[index].show_window)
-            load_selected_json_point(call, all_annotations[index].name, all_annotations[index].show_window, index);
+            display_window_of_selected_json_point(call, all_annotations[index].name, all_annotations[index].show_window, index);
     }
     
 
@@ -560,13 +566,15 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(bool loaded_from_file) {
 
         // in case that json_obj holds more points then
         if (i >= all_annotations.size()) {
-            this->all_annotations.push_back({x.value()["Annotation"], glm::vec3(temp[0], temp[1], temp[2]),
-                x.value()["Point Name"], x.value()["Show Window"]});
+            this->all_annotations.push_back({x.value()["Annotation"], glm::vec3(temp[0], temp[1], temp[2]), x.value()["Point Name"],
+                    x.value()["Show Window"], x.value()["Start Timestamp"], x.value()["End Timestamp"]});
         } else {
             this->all_annotations[i].annotation = x.value()["Annotation"];
             this->all_annotations[i].coordinates = glm::vec3(temp[0], temp[1], temp[2]);
             this->all_annotations[i].name = x.value()["Point Name"];
             this->all_annotations[i].show_window = x.value()["Show Window"];
+            this->all_annotations[i].start_ts = x.value()["Start Timestamp"];
+            this->all_annotations[i].start_ts = x.value()["End Timestamp"];
         }
     }
     // Case that we have LESS points in json_obj then we have entries in all_annotations:
@@ -576,10 +584,10 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(bool loaded_from_file) {
     }
 }
 
-/* Loads the selected Point from the Combo of display_json_window()
+/* Displays an ImGui Window for the selected Point from the Combo of display_json_window()
 It shows the values as they are currently in the individual global vectors
 On a Button press you can update the values of the current point in the json file */
-void AnnotationRenderer::load_selected_json_point(CallRender3DGL& call, std::string windowName, bool& window_open, int curr_index) {
+void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& call, std::string windowName, bool& window_open, int curr_index) {
     // check if the all_annotations vector is empty and if so then exit
     if (this->all_annotations.empty())
         return;
@@ -621,7 +629,7 @@ void AnnotationRenderer::warning_popup() {
 
 }
 
-
+/* Loads the json file that is found under its path into the json_obj and the vector all_annotatins */
 void AnnotationRenderer::load_json_from_file() {
     // TODO: change the path to the path of the json file
     // std::ifstream i("C:\\Dateien\\megamol\\pretty.json");
@@ -645,6 +653,14 @@ void AnnotationRenderer::load_json_from_file() {
     json_amount = temp;
     // now write the names to the and bools to the vector
     write_json_obj_data_to_vectors(true);
+}
+
+/*
+* Saves the current state of the variable "json_obj" into the json file for the currently used project.
+*/
+void AnnotationRenderer::save_json_to_file() {
+    std::ofstream o(determineJsonFilePath());
+    o << std::setw(4) << this->json_obj << std::endl;
 }
 
 // TODO: does this cause problems if the current project is NOT loaded BUT thrown together in the editor?

@@ -33,8 +33,29 @@ struct annotation_struct {
     std::string name;
     // Bool for showing the current point in a window
     bool show_window;
+    // Start Timestamp of the annotation
+    float start_ts;
+    // End Timestamp of the annotation
+    float end_ts;
 };
-// TODO: additions: - Timestamp of start and end
+
+// Struct for saving all variables that are needed for the "Adding Annotation" Window
+struct annot_window_struct {
+    // Coordinates in the Input Field
+    float coordinates_input[3];
+    // Annotation in the Input Field
+    std::string annotation_input;
+    // Sphere Color in the Input Field
+    float color_input[3];
+    // Point Name in Input Field
+    std::string point_name_input;
+    // Sphere Color for later use
+    glm::vec3 color;
+    // Bool for determining if the sphere for the current coordinates should be shown
+    bool show_point;
+    // annotation_struct for storing all inputs into the json_obj when pressing "save"
+    annotation_struct annot_struct;
+};
 
 
 namespace megamol::annotation {
@@ -157,13 +178,13 @@ private:
 
     void showAddingAnotationWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name, bool& window_open);
 
-    void save_new_point_to_json(glm::vec3 coords, std::string annotation, std::string point_name);
+    void save_new_point_to_json(annotation_struct input);
 
     void display_json_window(megamol::mmstd_gl::CallRender3DGL& call);
 
     void write_json_obj_data_to_vectors(bool loaded_from_file = false);
 
-    void load_selected_json_point(
+    void display_window_of_selected_json_point(
         megamol::mmstd_gl::CallRender3DGL& call, std::string windowName, bool& window_open, int curr_index);
 
     void update_point_in_json(glm::vec3 coords, std::string annotation, int point_index);
@@ -172,6 +193,10 @@ private:
     void warning_popup();
 
     void load_json_from_file();
+
+    void save_json_to_file();
+
+    void drawPointNames(megamol::mmstd_gl::CallRender3DGL& call);
 
     /* Calculate the coordinates for a given clicked */
     glm::vec3 calcClickedPoint(int x, int y, megamol::mmstd_gl::CallRender3DGL& call);
@@ -212,12 +237,14 @@ private:
     bool show_json_window;
 
     /* ImGui Second Window Variables */
-    float annot_win_coordinates_input[3];
-    std::string annot_win_annotation_input;
-    float annot_win_color_input[3];
-    glm::vec3 annot_win_color;
-    bool show_annot_win_point;
-    std::string annot_win_point_name_input;
+    //float annot_win_coordinates_input[3];
+    //std::string annot_win_annotation_input;
+    //float annot_win_color_input[3];
+    //glm::vec3 annot_win_color;
+    //bool show_annot_win_point;
+    //std::string annot_win_point_name_input;
+    //annotation_struct annot_win_struct;
+    annot_window_struct annot_win_struct;
 
 
     bool warning_popup_bool;
