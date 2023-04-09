@@ -215,6 +215,9 @@ private:
     void save_json_to_file();
 
     void drawPointNames(megamol::mmstd_gl::CallRender3DGL& call);
+    void save_slot_values_to_json();
+
+    void load_slot_values_from_json();
 
     /* Calculate the coordinates for a given clicked */
     glm::vec3 calcClickedPoint(int x, int y, megamol::mmstd_gl::CallRender3DGL& call);
