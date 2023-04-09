@@ -241,7 +241,10 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
 
     bool renderRes = true;
     if (this->enableAnnotationRendererSlot.Param<core::param::BoolParam>()->Value()) {
-        test(call);
+        //test(call);
+        // TODO: just testing new main function:
+        new_main(call);
+    }
     }
 
     //glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -258,7 +261,7 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
 }
 
 /*
-* Main function.
+* Main function. OLD!!!
 * This function generates the main ImGui window and allows the opening of all other windows.
 */
 void AnnotationRenderer::test(CallRender3DGL &call) {
@@ -313,6 +316,48 @@ void AnnotationRenderer::test(CallRender3DGL &call) {
         showSphereAtPoint(call, first_win_coordinates);
     }
     ImGui::End();
+
+
+}
+
+
+/*
+ * Main function.
+ * This function generates the main ImGui window and allows the opening of all other windows.
+ */
+void AnnotationRenderer::new_main(CallRender3DGL& call) {
+    bool valid_imgui_scope =
+        ((ImGui::GetCurrentContext() != nullptr) ? (ImGui::GetCurrentContext()->WithinFrameScope) : (false));
+    if (!valid_imgui_scope)
+        return;
+
+    // TODO: With this version it is not possible to close the window with the "x" button
+    /* Displays the Window for adding new Annotations */
+    if (this->enableAddingAnnotationWindowSlot.Param<core::param::BoolParam>()->Value()) {
+        this->anotherWindow = true;
+        showAddingAnotationWindow(call, "Second Window", this->anotherWindow);
+    } else {
+        this->anotherWindow = false;
+    }
+
+    /* Displays the Window for Handling all current Annotations */
+    if (this->enableJsonWindowSlot.Param<core::param::BoolParam>()->Value()) {
+        this->show_json_window = true;
+        display_json_window(call);
+    } else {
+         this->show_json_window = false;
+    }
+        
+    
+    // TODO: Add saving all points to JSON file in the main list? OR is it better to just have it in the "JSON window"?
+    // // Save the current state of the json_obj to a json file
+    // if (ImGui::Button("Save annotations to Json File")) {
+    //     save_json_to_file();
+    // }
+    // TODO: DEBUG ONLY
+    showSphereAtPoint(call, glm::vec3(0.0f, 0.0f, 0.0f));
+    drawConnectionLine(call, glm::vec2(1000.0f, 100.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+    
 }
 
 /*

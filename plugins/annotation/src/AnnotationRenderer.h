@@ -163,6 +163,9 @@ private:
     /* Test function for checking out how ImGUI behaves */
     void test(megamol::mmstd_gl::CallRender3DGL& call);
 
+    /* Main function that holds all the connections to calling other functions */
+    void new_main(megamol::mmstd_gl::CallRender3DGL& call);
+
 
 
     /** The simple shader for the drawing of GL_POINTS */
