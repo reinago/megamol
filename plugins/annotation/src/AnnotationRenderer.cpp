@@ -48,6 +48,10 @@ AnnotationRenderer::AnnotationRenderer()
         , enableAnnotationRendererSlot("AnnotationRenderer", "Enables the rendering of the Annotations")
         , sizeScalingSlot("scaling factor", "Scaling factor for the size of the rendered GL_POINTS")
         , linesColorSlot("linesColor", "Color of the Connection Lines between Annotation and Point in 3D")
+        , saveSlotValuesSlot("saveSlotValues", "Saves the current values of the slots")
+        , loadSlotValuesSlot("loadSlotValues", "Loades the saved values of the slots")
+        , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
+        , loadJsonFromFileSlot("loadJsonFromFile", "Loads the state of the Annotation from a Json File")
         , vbo(0)
         , ibo(0)
         , va(0)
@@ -80,8 +84,29 @@ AnnotationRenderer::AnnotationRenderer()
 
     this->linesColorSlot.SetParameter(new core::param::ColorParam("#ffffffff"));
     this->MakeSlotAvailable(&this->linesColorSlot);
+    this->saveSlotValuesSlot.SetParameter(
+        new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
+    this->MakeSlotAvailable(&this->saveSlotValuesSlot);
+
+    this->loadSlotValuesSlot.SetParameter(
+        new core::param::ButtonParam(core::view::Key::KEY_B, core::view::Modifier::SHIFT));
+    this->MakeSlotAvailable(&this->loadSlotValuesSlot);
+
+    this->loadJsonFromFileSlot.SetParameter(
+        new core::param::ButtonParam(core::view::Key::KEY_C, core::view::Modifier::SHIFT));
+    this->MakeSlotAvailable(&this->loadJsonFromFileSlot);
+
+    this->saveJsonToFileSlot.SetParameter(
+        new core::param::ButtonParam(core::view::Key::KEY_D, core::view::Modifier::SHIFT));
+    this->MakeSlotAvailable(&this->saveJsonToFileSlot);
+
 
     this->json_obj["Points"];
+    this->json_obj["Slot Values"];
+
+    // load the json file:
+    // TODO: loading jason from file here throws an error
+    // load_json_from_file();
 }
 
 /*
@@ -347,6 +372,26 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     } else {
          this->show_json_window = false;
     }
+    // TODO: add some kind of Prompt for 
+    if (this->loadJsonFromFileSlot.IsDirty()) {
+        this->loadJsonFromFileSlot.ResetDirty();
+        load_json_from_file(); // keep in mind this WILL just overvrite the current state without any promt right now!!!
+    }
+
+    if (this->saveJsonToFileSlot.IsDirty()) {
+        this->saveJsonToFileSlot.ResetDirty();
+        save_json_to_file();
+    }
+
+    if (this->loadSlotValuesSlot.IsDirty()) {
+        this->loadSlotValuesSlot.ResetDirty();
+        load_slot_values_from_json();
+    }
+
+    if (this->saveSlotValuesSlot.IsDirty()) {
+        this->saveSlotValuesSlot.ResetDirty();
+        save_slot_values_to_json();
+    }    
         
     
     // TODO: Add saving all points to JSON file in the main list? OR is it better to just have it in the "JSON window"?
@@ -753,6 +798,26 @@ glm::vec3 AnnotationRenderer::calcClickedPoint(int x, int y, CallRender3DGL& cal
     float nDepth = 2 * depth - 1;
     
     return getWorldCoordsFromScreenPos(call, x, y, nDepth, false);
+}
+
+/* Save Slot Values to JSON
+ * This function is called when the save button is pressed.
+ * It saves the current values of the slots to the json file.
+ */
+void AnnotationRenderer::save_slot_values_to_json() {
+    this->json_obj["SlotValues"]["textScaling"] = this->textScalingSlot.Param<core::param::FloatParam>()->Value();
+    this->json_obj["SlotValues"]["linesColor"] = this->linesColorSlot.Param<core::param::ColorParam>()->Value();
+    this->json_obj["SlotValues"]["sphereColor"] = this->sphereColorSlot.Param<core::param::ColorParam>()->Value();
+    this->json_obj["SlotValues"]["sphereSizeScaling"] = this->sizeScalingSlot.Param<core::param::FloatParam>()->Value();
+}
+
+/* Load the Slot Values from the JSON
+ */
+void AnnotationRenderer::load_slot_values_from_json() {
+    this->textScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["textScaling"]);
+    this->linesColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["linesColor"]);
+    this->sphereColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["sphereColor"]);
+    this->sizeScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["sphereSizeScaling"]);
 }
 
 /*Converts the given 3D world coordinates into 2D screen coordinates.

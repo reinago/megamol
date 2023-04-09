@@ -221,6 +221,14 @@ private:
     // gives the depth buffer to the renderer
     // megamol::core::CallerSlot get_depth_buffer;
 
+    core::param::ParamSlot saveSlotValuesSlot;
+
+    core::param::ParamSlot loadSlotValuesSlot;
+
+    core::param::ParamSlot loadJsonFromFileSlot;
+
+    core::param::ParamSlot saveJsonToFileSlot;
+
 
     /*
     VARIABLES
