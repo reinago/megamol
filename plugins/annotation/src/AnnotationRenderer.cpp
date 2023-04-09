@@ -47,7 +47,7 @@ AnnotationRenderer::AnnotationRenderer()
         : Renderer3DModuleGL()
         , enableAnnotationRendererSlot("AnnotationRenderer", "Enables the rendering of the Annotations")
         , sizeScalingSlot("scaling factor", "Scaling factor for the size of the rendered GL_POINTS")
-        , linesColorSlot("linesColor", "Color of the lines")
+        , linesColorSlot("linesColor", "Color of the Connection Lines between Annotation and Point in 3D")
         , vbo(0)
         , ibo(0)
         , va(0)
@@ -704,19 +704,82 @@ glm::vec3 AnnotationRenderer::calcClickedPoint(int x, int y, CallRender3DGL& cal
     glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, data); // change 1,1 if bigger area is needed
     float depth = data[0];
     delete[] data;
+
+    float nDepth = 2 * depth - 1;
     
+    return getWorldCoordsFromScreenPos(call, x, y, nDepth, false);
+}
+
+/*Converts the given 3D world coordinates into 2D screen coordinates.
+ * This is needed to draw the text at the correct position.
+ */
+glm::vec2 AnnotationRenderer::getScreenPosFromWorldCoords(CallRender3DGL& call, glm::vec3 input_coords) {
+    auto const lhsFBO = call.GetFramebuffer();
     core::view::Camera cam = call.GetCamera();
+    auto view = cam.getViewMatrix();
+    auto proj = cam.getProjectionMatrix();
+    auto mvp = proj * view;
+    glm::vec4 screenCoords = mvp * glm::vec4(input_coords, 1.0f);
+    
+    screenCoords.x /= screenCoords.w;
+    screenCoords.y /= screenCoords.w;
+    screenCoords.x = lhsFBO->getWidth() * (screenCoords.x + 1.0f) / 2.0f;
+    screenCoords.y = lhsFBO->getHeight() * (1.0f - (screenCoords.y + 1.0f) / 2.0f);
+    
+    return glm::vec2(screenCoords.x, screenCoords.y);    
+}
+
+/* Converts Screen Position with given z Value into Worldspace coordinates.
+ * z Value is already in World Space coordinates form.
+ * x, y Values are the Screen Position in Screen Space coordinates form.
+ * flipY is needed because the y Position needs to be flipped
+ * Set it to true if this is still needed and to false if previous operation already did the flip
+ */
+glm::vec3 AnnotationRenderer::getWorldCoordsFromScreenPos(CallRender3DGL& call, int x, int y, float z, bool flipY) {
+    auto const lhsFBO = call.GetFramebuffer();
+    // flip the y coordinates with getHeight from the Framebuffer
+    if (flipY) {
+        y = lhsFBO->getHeight() - y;
+    }
+
+    auto cam = call.GetCamera();
     auto view = cam.getViewMatrix();
     auto proj = cam.getProjectionMatrix();
     auto mvp = proj * view;
     auto invMVP = glm::inverse(mvp);
 
-    float nDepth = 2 * depth - 1;
-    // conversion/ casting to float needed for division
     float nx = (2 * ((float)x / lhsFBO->getWidth())) - 1; //Einheitswürfel
     float ny = (2 * ((float)y / lhsFBO->getHeight())) - 1;
-    
-    glm::vec4 h = invMVP * glm::vec4(nx, ny, nDepth, 1.0);
-    glm::vec3 result = glm::vec3(h)/h.w;
+
+    glm::vec4 h = invMVP * glm::vec4(nx, ny, z, 1.0f);
+    glm::vec3 result = glm::vec3(h) / h.w;
     return result;
+}
+/* Function that draws a connection line between an ImGui window and the given coordinates in 3D. */
+void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos) {
+    // TODO: add variable for changing the line color?
+    auto& colptr = this->linesColorSlot.Param<core::param::ColorParam>()->Value();
+    glm::vec3 lineColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    auto cam = call.GetCamera();
+    auto view = cam.getViewMatrix();
+    auto proj = cam.getProjectionMatrix();
+    auto mvp = proj * view;
+
+    // TODO: get correct z Value from nearPlane (But I do not see how it can be accessed at least not from call.camera, because it is a private member)
+    float z = 0.0f;
+
+    // convert windowPos to world Space coordinates
+    glm::vec3 convertedScreenPos = getWorldCoordsFromScreenPos(call, windowPos.x, windowPos.y, z, true);
+
+    this->lineShader->use();
+    this->lineShader->setUniform("mvp", mvp);
+    this->lineShader->setUniform("color", colptr[0], colptr[1], colptr[2], colptr[3]);
+
+    // draw line
+    glEnable(GL_DEPTH_TEST);
+    glBegin(GL_LINES);
+    glVertex3f(convertedScreenPos[0], convertedScreenPos[1], convertedScreenPos[2]);
+    glVertex3f(worldPos[0], worldPos[1], worldPos[2]);
+    glEnd();
+    glDisable(GL_DEPTH_TEST);
 }

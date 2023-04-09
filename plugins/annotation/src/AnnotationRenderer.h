@@ -203,6 +203,11 @@ private:
 
     std::string determineJsonFilePath() const;
 
+    glm::vec2 getScreenPosFromWorldCoords(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 input_coords);
+
+    void drawConnectionLine(megamol::mmstd_gl::CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos);
+
+    glm::vec3 getWorldCoordsFromScreenPos(megamol::mmstd_gl::CallRender3DGL& call, int x, int y, float z, bool flipY);
 
     /* Parameters */
     /** Slot for the scaling factor of the pointsize*/
