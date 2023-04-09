@@ -48,6 +48,7 @@ AnnotationRenderer::AnnotationRenderer()
         , enableAnnotationRendererSlot("AnnotationRenderer", "Enables the rendering of the Annotations")
         , sizeScalingSlot("scaling factor", "Scaling factor for the size of the rendered GL_POINTS")
         , linesColorSlot("linesColor", "Color of the Connection Lines between Annotation and Point in 3D")
+        , sphereColorSlot("sphereColor", "Color of the Spheres that show the position of the annotations")
         , saveSlotValuesSlot("saveSlotValues", "Saves the current values of the slots")
         , loadSlotValuesSlot("loadSlotValues", "Loades the saved values of the slots")
         , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
@@ -55,7 +56,10 @@ AnnotationRenderer::AnnotationRenderer()
         , vbo(0)
         , ibo(0)
         , va(0)
+        , occlusionQuery()
+        , frameType(0)
         , boundingBoxes()
+        , totalFrameCount(0.0f)
         , picking_enabled(false)
         , picked_a_point(false)
         , lastX()
@@ -84,6 +88,9 @@ AnnotationRenderer::AnnotationRenderer()
 
     this->linesColorSlot.SetParameter(new core::param::ColorParam("#ffffffff"));
     this->MakeSlotAvailable(&this->linesColorSlot);
+    
+    this->sphereColorSlot.SetParameter(new core::param::ColorParam("#ffffffff"));
+    this->MakeSlotAvailable(&this->sphereColorSlot);
     this->saveSlotValuesSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
     this->MakeSlotAvailable(&this->saveSlotValuesSlot);
@@ -231,6 +238,9 @@ bool AnnotationRenderer::GetExtents(CallRender3DGL& call) {
         if ((*chainedCall)(core::view::AbstractCallRender::FnGetExtents)) {
             call = *chainedCall;
             this->boundingBoxes = call.AccessBoundingBoxes(); //TODO: change this, because we have no bounding boxes
+            // TODO: save amount of Frames
+            this->totalFrameCount = chainedCall->TimeFramesCount();
+            // printf("totalFrameCount: %f\n", this->totalFrameCount);
             return true;
         }
     }
@@ -265,6 +275,7 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
 
 
     bool renderRes = true;
+    frameType = (frameType + 1) % 2;
     if (this->enableAnnotationRendererSlot.Param<core::param::BoolParam>()->Value()) {
         //test(call);
         // TODO: just testing new main function:
@@ -556,6 +567,12 @@ void AnnotationRenderer::save_new_point_to_json(annotation_struct input) {
         {"End Timestamp", input.end_ts}
     };
 
+    // Add entries to occlusionQuery and oqResults vectors:
+    occlusionQuery.query.resize(occlusionQuery.query.size() + 2);
+    occlusionQuery.result.resize(occlusionQuery.result.size() + 2);
+    // glDeleteQueries(occlusionQuery.size(), occlusionQuery.data());
+    glGenQueries(occlusionQuery.query.size(), occlusionQuery.query.data() + occlusionQuery.query.size() - 2);
+
     // TODO: maybe save the json every time this function is called
     // TODO: In case of saving every time a new entry was made, maybe add a _temp file that is deleted after the user saves to the real file
     // write json to vectors every time a new entry was made?
@@ -639,6 +656,7 @@ void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
     }
 
     ImGui::End();
+    determine_points_to_be_shown(call);
 }
 
 /* Writes the Names of the currently stored Points in the json_obj to a vector
@@ -672,6 +690,15 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(bool loaded_from_file) {
     if (iterate < all_annotations.size()) {
         all_annotations.erase(std::next(all_annotations.begin(), iterate + 1), all_annotations.end()); 
     }
+    occlusionQuery.query.clear();
+    occlusionQuery.query.resize(2 * all_annotations.size());
+    occlusionQuery.result.clear();
+    occlusionQuery.result.resize(2 * all_annotations.size());
+    occlusionQuery.resultAv.clear();
+    occlusionQuery.resultAv.resize(2 * all_annotations.size());
+    occlusionQuery.queryStarted.clear();
+    occlusionQuery.queryStarted.resize(2 * all_annotations.size());
+    glGenQueries(occlusionQuery.query.size(), occlusionQuery.query.data());
 }
 
 /* Displays an ImGui Window for the selected Point from the Combo of display_json_window()
@@ -820,6 +847,45 @@ void AnnotationRenderer::load_slot_values_from_json() {
     this->sizeScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["sphereSizeScaling"]);
 }
 
+/*Determines which points have to be drawn and which not.
+ * It does this by checking if the current frame is in the time span of the point.
+ * Afterwards it also checks if the point is in the foreground or background.
+*/
+void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
+    if (this->all_annotations.size() == 0) {
+        return;
+    }
+    float currentTimeStamp = call.Time();
+    for (int i = 0; i < all_annotations.size(); ++i) {
+        if (currentTimeStamp >= all_annotations[i].start_ts && currentTimeStamp <= all_annotations[i].end_ts) {
+            showSphereAtPointIndex(call, this->all_annotations[i].coordinates, i);
+            this->all_annotations[i].point_at_current_time = true;
+
+            int t = (frameType + 1) % 2;
+            if (occlusionQuery.queryStarted[2 * i + t]) {
+                glGetQueryObjectuiv(
+                    occlusionQuery.query[2 * i + t], GL_QUERY_RESULT_AVAILABLE, &occlusionQuery.resultAv[2 * i + t]);
+                if (occlusionQuery.resultAv[2 * i + t] == GL_TRUE) {
+                    glGetQueryObjectuiv(
+                        occlusionQuery.query[2 * i + t], GL_QUERY_RESULT, &occlusionQuery.result[2 * i + t]);
+                    if (occlusionQuery.result[2 * i + t] == GL_TRUE) {
+                        this->all_annotations[i].show_point = true;
+                    } else {
+                        this->all_annotations[i].show_point = false;
+                    }
+                }
+            }
+        } else {
+            this->all_annotations[i].show_point = false;
+            this->all_annotations[i].point_at_current_time = false;
+        }
+        if (this->all_annotations[i].show_point) {
+            display_visual_points_windows(
+                call, all_annotations[i].name, i, all_annotations[i].coordinates);
+        }
+    }
+}
+
 /*Converts the given 3D world coordinates into 2D screen coordinates.
  * This is needed to draw the text at the correct position.
  */
@@ -864,6 +930,45 @@ glm::vec3 AnnotationRenderer::getWorldCoordsFromScreenPos(CallRender3DGL& call, 
     glm::vec4 h = invMVP * glm::vec4(nx, ny, z, 1.0f);
     glm::vec3 result = glm::vec3(h) / h.w;
     return result;
+}
+/* Draw a sphere at the coordinates given in the vec3
+* Additionally also start a glQuery of GL_ANY_SAMPLES_PASSED for these coordinates.
+* This is used to check if the drawn point is visible or not.
+*/
+void AnnotationRenderer::showSphereAtPointIndex(CallRender3DGL& call, glm::vec3 coords, int index) {
+    // TODO: currently the sphere is ALWAYS in the front? (even when it SHOULD be behind other objects)
+    core::view::Camera cam = call.GetCamera();
+    auto view = cam.getViewMatrix();
+    auto proj = cam.getProjectionMatrix();
+    auto mvp = proj * view;
+    auto cam_pose = cam.get<core::view::Camera::Pose>();
+
+    auto& colptr = this->sphereColorSlot.Param<core::param::ColorParam>()->Value();
+
+    glm::vec3 current = coords;
+    glEnable(GL_DEPTH_TEST);
+    /* This enables the use of a Renderer for the generated point at the given coordinates that will stay there no matter the direction of the camera */
+    this->sphereShader->use();
+
+    this->sphereShader->setUniform("mvp", mvp);
+    this->sphereShader->setUniform("view", view);
+    this->sphereShader->setUniform("proj", proj);
+    this->sphereShader->setUniform("camRight", cam_pose.right.x, cam_pose.right.y, cam_pose.right.z);
+    this->sphereShader->setUniform("camUp", cam_pose.up.x, cam_pose.up.y, cam_pose.up.z);
+    this->sphereShader->setUniform("camPos", cam_pose.position.x, cam_pose.position.y, cam_pose.position.z);
+    this->sphereShader->setUniform("camDir", cam_pose.direction.x, cam_pose.direction.y, cam_pose.direction.z);
+    this->sphereShader->setUniform("scalingFactor", this->sizeScalingSlot.Param<core::param::FloatParam>()->Value());
+    this->sphereShader->setUniform("color", colptr[0], colptr[1], colptr[2], colptr[3]);
+
+    // Render a point at the given coordinates
+    // TODO: use a different mode
+    glBeginQuery(GL_ANY_SAMPLES_PASSED, this->occlusionQuery.query[2 * index + frameType]);
+    glBegin(GL_POINTS);
+    glVertex3f(current[0], current[1], current[2]);
+    glEnd();
+    glEndQuery(GL_ANY_SAMPLES_PASSED);
+    occlusionQuery.queryStarted[2 * index + frameType] = true;
+    glDisable(GL_DEPTH_TEST);
 }
 /* Function that draws a connection line between an ImGui window and the given coordinates in 3D. */
 void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos) {

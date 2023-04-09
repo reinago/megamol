@@ -33,6 +33,10 @@ struct annotation_struct {
     std::string name;
     // Bool for showing the current point in a window
     bool show_window;
+    // Bool for showing the current point in the 3D view
+    bool show_point;
+    // Bool for showing if the current point might be visible at the current time
+    bool point_at_current_time;
     // Start Timestamp of the annotation
     float start_ts;
     // End Timestamp of the annotation
@@ -55,6 +59,17 @@ struct annot_window_struct {
     bool show_point;
     // annotation_struct for storing all inputs into the json_obj when pressing "save"
     annotation_struct annot_struct;
+};
+
+struct occlusionQueries {
+    // Query itself
+    std::vector<GLuint> query;
+    // Query result
+    std::vector<GLuint> result;
+    // Query if the result is aviable
+    std::vector<GLuint> resultAv;
+    // Bool if the query was started
+    std::vector<bool> queryStarted;
 };
 
 
@@ -206,7 +221,11 @@ private:
 
     std::string determineJsonFilePath() const;
 
+    void determine_points_to_be_shown(megamol::mmstd_gl::CallRender3DGL& call);
+
     glm::vec2 getScreenPosFromWorldCoords(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 input_coords);
+
+    void showSphereAtPointIndex(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords, int index);
 
     void drawConnectionLine(megamol::mmstd_gl::CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos);
 
@@ -215,6 +234,8 @@ private:
     /* Parameters */
     /** Slot for the scaling factor of the pointsize*/
     core::param::ParamSlot sizeScalingSlot;
+
+    core::param::ParamSlot sphereColorSlot;
 
     core::param::ParamSlot linesColorSlot;
 
@@ -233,6 +254,16 @@ private:
     /*
     VARIABLES
     */
+    /* Frames Variables */
+    // stores the total number of frames of the animation
+    float totalFrameCount;
+
+    // stores if the frame is even or uneven (0 or 1)
+    int frameType;
+
+    /* GL variables */
+    occlusionQueries occlusionQuery;
+    
     /** Picking Variables */
     bool picking_enabled;
     bool picked_a_point;
