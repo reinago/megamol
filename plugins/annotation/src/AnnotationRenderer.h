@@ -24,6 +24,7 @@
 #include "mmstd_gl/renderer/Renderer3DModuleGL.h"
 #include "ScriptPaths.h"
 
+#include "FrontendResource.h"
 // struct annotation_struct with glm::vec3 coordinates, std::string annotation, std::string name, bool show_window
 struct annotation_struct {
     // Annotation of the current point
@@ -131,6 +132,7 @@ public:
     std::vector<std::string> requested_lifetime_resources() override {
         std::vector<std::string> resources = megamol::mmstd_gl::Renderer3DModuleGL::requested_lifetime_resources();
         resources.emplace_back("LuaScriptPaths");
+        resources.emplace_back("ExecuteLuaScript");
         return resources;
     }
     
@@ -230,6 +232,8 @@ private:
     glm::vec3 calcClickedPoint(int x, int y, megamol::mmstd_gl::CallRender3DGL& call);
 
     std::string determineJsonFilePath() const;
+
+    void loadCameraPosition(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 inputCamPos, glm::quat inputCamOrient);
 
     void determine_points_to_be_shown(megamol::mmstd_gl::CallRender3DGL& call);
 

@@ -28,6 +28,9 @@
 #include "mmcore/utility/log/Log.h"
 #include "mmcore_gl/utility/ShaderFactory.h"
 
+#include "FrontendResource.h"
+#include "CommonTypes.h"
+
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
@@ -445,6 +448,12 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         this->picking_enabled = true;
     }
 
+    // Button for saving the current camera position
+    if (ImGui::Button("Save current camera position")) {
+        this->annot_win_struct.annot_struct.cam_pos = call.GetCamera().getPose().position;
+        this->annot_win_struct.annot_struct.cam_orientation = call.GetCamera().getPose().to_quat();
+    }
+
     if (this->picking_enabled) {
         ImGui::Text("Click in the viewport to add a new point");
         // Wait till the user has clicked in the Window and then calculate the coordinates from this point.
@@ -736,6 +745,11 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
     // ImGui::Button
     if (ImGui::Button("Update the json_obj with current values"))
         update_point_in_json(this->all_annotations[curr_index].coordinates, this->all_annotations[curr_index].annotation, curr_index);
+    // load camera Position:
+    if (ImGui::Button("Load camera position"))
+        loadCameraPosition(
+            call, this->all_annotations[curr_index].cam_pos, this->all_annotations[curr_index].cam_orientation);
+    
     ImGui::End();
 }
 
@@ -861,6 +875,24 @@ void AnnotationRenderer::load_slot_values_from_json() {
     this->linesColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["linesColor"]);
     this->sphereColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["sphereColor"]);
     this->sizeScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["sphereSizeScaling"]);
+}
+
+/* Set the Camera to the given Coordinates
+*/
+void AnnotationRenderer::loadCameraPosition(CallRender3DGL& call, glm::vec3 inputCamPos, glm::quat inputCamOrient) {
+    auto thingy = const_cast<frontend_resources::common_types::lua_func_type*>(&frontend_resources.get<frontend_resources::common_types::lua_func_type>());
+    std::string camPosString = "mmSetParamValue(\"::view::cam::position\",[=[" + std::to_string(inputCamPos.x) + std::string(";") +
+                    std::to_string(inputCamPos.y) + std::string(";") + std::to_string(inputCamPos.z) +
+                    std::string("]=])");
+    std::string camOrientString = "mmSetParamValue(\"::view::cam::orientation\",[=[" + std::to_string(inputCamOrient[0]) + std::string(";") +
+        std::to_string(inputCamOrient[1]) + std::string(";") + std::to_string(inputCamOrient[2]) + std::string(";") +
+        std::to_string(inputCamOrient[3]) + std::string("]=])");
+    // TODO: This version ONLY works for the "test" project file, because others have different path names...
+    (*thingy)(camPosString);
+    (*thingy)(camOrientString);
+    std::cout << camPosString << std::endl;
+    std::cout << camOrientString << std::endl;
+    print_coords(inputCamPos);
 }
 
 /*Determines which points have to be drawn and which not.
