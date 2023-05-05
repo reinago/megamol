@@ -399,7 +399,7 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     /* Displays the Window for adding new Annotations */
     if (this->enableAddingAnnotationWindowSlot.Param<core::param::BoolParam>()->Value()) {
         this->anotherWindow = true;
-        showAddingAnotationWindow(call, "Second Window", this->anotherWindow);
+        showAddingAnotationWindow(call, "Adding new Annotations", this->anotherWindow);
     } else {
         this->anotherWindow = false;
     }
@@ -414,7 +414,7 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     // TODO: add some kind of Prompt for 
     if (this->loadJsonFromFileSlot.IsDirty()) {
         this->loadJsonFromFileSlot.ResetDirty();
-        load_json_from_file(); // keep in mind this WILL just overvrite the current state without any promt right now!!!
+        load_json_from_file(call); // keep in mind this WILL just overvrite the current state without any promt right now!!!
     }
 
     if (this->saveJsonToFileSlot.IsDirty()) {
@@ -515,7 +515,7 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     }
     if (ImGui::Button("Save current coords and Annotation")) {
         // TODO: CLEAR all inputs of the imgui variables in this window after saving the new point (to prevent dupplications etc)?
-        save_new_point_to_json(this->annot_win_struct.annot_struct);
+        save_new_point_to_json(call, this->annot_win_struct.annot_struct);
     }
 
     if (this->annot_win_struct.show_point) {
@@ -584,7 +584,7 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
 }
 
 /* Function to write the current coordinates and annotation to a json file */
-void AnnotationRenderer::save_new_point_to_json(annotation_struct input) {
+void AnnotationRenderer::save_new_point_to_json(CallRender3DGL& call, annotation_struct input) {
     // TODO: add saving of color?
 
     // update the amount of points with annotations
@@ -615,13 +615,15 @@ void AnnotationRenderer::save_new_point_to_json(annotation_struct input) {
     // TODO: In case of saving every time a new entry was made, maybe add a _temp file that is deleted after the user saves to the real file
     // write json to vectors every time a new entry was made?
     // TODO: Calling write to vector CLOSES ALL opened windows!!!!!!
-    write_json_obj_data_to_vectors(false);
+    // TODO: something went wrong with Time stamps when saving two similar points close after one another...
+    write_json_obj_data_to_vectors(call, false);
     std::cout << json_obj.dump(4) << std::endl;
 }
 
 /* Function to update the values of the given point in the json_obj and the corresponding vectors.
 Only updates Annotation and Coordinates. */
-void AnnotationRenderer::update_point_in_json(glm::vec3 coords, std::string annotation, int point_index) {
+void AnnotationRenderer::update_point_in_json(
+    CallRender3DGL& call, glm::vec3 coords, std::string annotation, int point_index) {
     // update the json object
     this->json_obj["Points"][point_index]["Coordinates"] = {coords.x, coords.y, coords.z}; // update the Coordinates
     this->json_obj["Points"][point_index]["Annotation"] = annotation;                      // update the annotation
@@ -636,12 +638,12 @@ void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
     ImGui::Text("WARNING: Importing a file WILL overvrite everything you currently have!");
     if (ImGui::Button("Load json from file")) {
         // TODO: add popup
-        warning_popup_bool = true;
-        // load_json_from_file();
+        // warning_popup_bool = true;
+        load_json_from_file(call);
     }
 
-    if (warning_popup_bool)
-        warning_popup();
+    //if (warning_popup_bool)
+    //    warning_popup();
 
     if (ImGui::Button("Print the current state of json_obj to console")) {
         std::cout << std::setw(4) << json_obj << std::endl;
@@ -684,7 +686,7 @@ void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
     
 
     if (ImGui::Button("Save Names to vector")) {
-        write_json_obj_data_to_vectors();
+        write_json_obj_data_to_vectors(call);
         /*for (std::string i : this->json_points_names)
             std::cout << i << ' ';*/
     }
@@ -699,8 +701,8 @@ void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
 
 /* Writes the Names of the currently stored Points in the json_obj to a vector
 Add a bool of true, if this function is called after loading a file, this will reset all stored window-bools */
-void AnnotationRenderer::write_json_obj_data_to_vectors(bool loaded_from_file) {
     if (loaded_from_file)
+void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bool loaded_from_file) {
         all_annotations.clear(); // when loading from a file then first clear the vector.
 
     int iterate = 0;
@@ -768,7 +770,8 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
     showSphereAtPoint(call, this->all_annotations[curr_index].coordinates);
     // ImGui::Button
     if (ImGui::Button("Update the json_obj with current values"))
-        update_point_in_json(this->all_annotations[curr_index].coordinates, this->all_annotations[curr_index].annotation, curr_index);
+        update_point_in_json(call, this->all_annotations[curr_index].coordinates, this->all_annotations[curr_index].annotation, curr_index);
+
     // load camera Position:
     if (ImGui::Button("Load camera position"))
         loadCameraPosition(
@@ -801,7 +804,7 @@ void AnnotationRenderer::warning_popup() {
 }
 
 /* Loads the json file that is found under its path into the json_obj and the vector all_annotatins */
-void AnnotationRenderer::load_json_from_file() {
+void AnnotationRenderer::load_json_from_file(CallRender3DGL& call) {
     // TODO: change the path to the path of the json file
     // std::ifstream i("C:\\Dateien\\megamol\\pretty.json");
     std::string file_path = determineJsonFilePath();
@@ -823,7 +826,7 @@ void AnnotationRenderer::load_json_from_file() {
     }
     json_amount = temp;
     // now write the names to the and bools to the vector
-    write_json_obj_data_to_vectors(true);
+    write_json_obj_data_to_vectors(call, true);
 }
 
 /*

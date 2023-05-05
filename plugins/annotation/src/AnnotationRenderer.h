@@ -205,21 +205,22 @@ private:
 
     void showAddingAnotationWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name, bool& window_open);
 
-    void save_new_point_to_json(annotation_struct input);
+    void save_new_point_to_json(megamol::mmstd_gl::CallRender3DGL& call, annotation_struct input);
 
     void display_json_window(megamol::mmstd_gl::CallRender3DGL& call);
 
-    void write_json_obj_data_to_vectors(bool loaded_from_file = false);
+    void write_json_obj_data_to_vectors(megamol::mmstd_gl::CallRender3DGL& call, bool loaded_from_file = false);
 
     void display_window_of_selected_json_point(
         megamol::mmstd_gl::CallRender3DGL& call, std::string windowName, bool& window_open, int curr_index);
 
-    void update_point_in_json(glm::vec3 coords, std::string annotation, int point_index);
+    void update_point_in_json(
+        megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords, std::string annotation, int point_index);
 
     // void warning_popup(std::string warning_message);
     void warning_popup();
 
-    void load_json_from_file();
+    void load_json_from_file(megamol::mmstd_gl::CallRender3DGL& call);
 
     void save_json_to_file();
 
