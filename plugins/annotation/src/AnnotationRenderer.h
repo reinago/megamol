@@ -212,8 +212,6 @@ private:
 
     void save_new_point_to_json(megamol::mmstd_gl::CallRender3DGL& call, annotation_struct input);
 
-    void display_json_window(megamol::mmstd_gl::CallRender3DGL& call);
-
     void write_json_obj_data_to_vectors(megamol::mmstd_gl::CallRender3DGL& call, bool loaded_from_file = false);
 
     void display_window_of_selected_json_point(

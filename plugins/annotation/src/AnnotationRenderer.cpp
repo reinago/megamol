@@ -347,7 +347,7 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     /* Displays the Window for Handling all current Annotations */
     if (this->enableJsonWindowSlot.Param<core::param::BoolParam>()->Value()) {
         this->show_json_window = true;
-        display_json_window(call);
+        determine_points_to_be_shown(call);
     } else {
          this->show_json_window = false;
     }
@@ -578,75 +578,6 @@ void AnnotationRenderer::update_point_in_json(
     display_visual_points_windows(call, this->all_annotations[point_index].name, point_index,
         this->all_annotations[point_index].coordinates, glm::vec2(0.0f, 0.0f), false, true);
     std::cout << json_obj.dump(4) << std::endl;
-}
-
-/* Opens a new window for loading from json file or loading from the current json_obj and display all aviable Points. */
-void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
-    ImGui::Begin("test", &this->show_json_window);
-    // this->anotherWindow = true;
-    // showAddingAnotationWindow(call, "Second Window", this->show_json_window);
-    ImGui::Text("WARNING: Importing a file WILL overvrite everything you currently have!");
-    if (ImGui::Button("Load json from file")) {
-        // TODO: add popup
-        // warning_popup_bool = true;
-        load_json_from_file(call);
-    }
-
-    //if (warning_popup_bool)
-    //    warning_popup();
-
-    if (ImGui::Button("Print the current state of json_obj to console")) {
-        std::cout << std::setw(4) << json_obj << std::endl;
-    }
-
-    // std::vector items{"a", "b", "c"}; // defined somewhere
-    // int selectedIndex = 0;            // you need to store this state somewhere
-    static const char* current_item = NULL;
-
-    // later in your code...
-    if (ImGui::BeginCombo("combo", current_item)) {
-        for (int i = 0; i < this->all_annotations.size(); ++i) {
-            const bool isSelected = (json_point_name_selectedIndex == i);
-            if (ImGui::Selectable(this->all_annotations[i].name.c_str(), isSelected)) {
-                json_point_name_selectedIndex = i;
-                current_item = this->all_annotations[i].name.c_str();
-            }
-
-            // Set the initial focus when opening the combo
-            // (scrolling + keyboard navigation focus)
-            if (isSelected) {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndCombo();
-    }
-
-    // TODO: Get a good name for this new bool variable
-    // TODO: Maybe make a global vector for all to be opened windows of points
-    // => can dynamically work with more windows BUT then we have the problem of how to keep the windows open when the function will no longer be called...
-
-    if (ImGui::Button("show current point")) {
-        this->all_annotations[json_point_name_selectedIndex].show_window = true;
-    }
-
-    for (int index = 0; index < all_annotations.size(); ++index) {
-        if (all_annotations[index].show_window)
-            display_window_of_selected_json_point(call, all_annotations[index].name, all_annotations[index].show_window, index);
-    }
-    
-
-    if (ImGui::Button("Save Names to vector")) {
-        write_json_obj_data_to_vectors(call);
-        /*for (std::string i : this->json_points_names)
-            std::cout << i << ' ';*/
-    }
-
-    if (ImGui::Button("print currently selected item")) {
-        std::cout << current_item << std::endl;
-    }
-
-    ImGui::End();
-    determine_points_to_be_shown(call);
 }
 
 /* Writes the Names of the currently stored Points in the json_obj to a vector
