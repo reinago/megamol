@@ -507,7 +507,7 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     auto mvp = proj * view;
     auto cam_pose = cam.get<core::view::Camera::Pose>();
 
-    auto colptr = this->linesColorSlot.Param<core::param::ColorParam>()->Value();
+    auto& colptr = this->sphereColorSlot.Param<core::param::ColorParam>()->Value();
 
     glm::vec3 current = coords;
     glEnable(GL_DEPTH_TEST);
@@ -522,13 +522,12 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     this->sphereShader->setUniform("camPos", cam_pose.position.x, cam_pose.position.y, cam_pose.position.z);
     this->sphereShader->setUniform("camDir", cam_pose.direction.x, cam_pose.direction.y, cam_pose.direction.z);
     this->sphereShader->setUniform("scalingFactor", this->sizeScalingSlot.Param<core::param::FloatParam>()->Value());
+    this->sphereShader->setUniform("color", colptr[0], colptr[1], colptr[2], colptr[3]);
 
     // Render a point at the given coordinates
     // TODO: use a different mode
     glBegin(GL_POINTS);
-    glVertex3f(current[0], current[1], current[2]);
-    // TODO: Color the point with a user given color
-    // glColor3f(colptr[0], colptr[1], colptr[2]);
+    glVertex3f(current[0], current[1], current[2]); 
     glEnd();
 
 
@@ -548,6 +547,7 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     glVertex3f(1.0f, 1.0f, 1.0f);
     glColor3f(colptr[0], colptr[1], colptr[2]);
     glEnd();*/
+    glDisable(GL_DEPTH_TEST);
 }
 
 /* Function to write the current coordinates and annotation to a json file */
@@ -980,9 +980,12 @@ void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 wind
     auto view = cam.getViewMatrix();
     auto proj = cam.getProjectionMatrix();
     auto mvp = proj * view;
+    float z = -1.0f;
 
-    // TODO: get correct z Value from nearPlane (But I do not see how it can be accessed at least not from call.camera, because it is a private member)
-    float z = 0.0f;
+    /*Line too short when using NearPlane as z.
+    When using z = 0.0f then the line IS drawn to the correct location AND has a good length
+    BUT then it can be obscurred by other objects in the scene, that should not be in front of the line.
+    BUT with z = -1.0f it somehow works... (at least for data sets, that are inside of the "Einheitswürfel")*/
 
     // convert windowPos to world Space coordinates
     glm::vec3 convertedScreenPos = getWorldCoordsFromScreenPos(call, windowPos.x, windowPos.y, z, true);
