@@ -952,9 +952,17 @@ void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
     }
     float currentTimeStamp = call.Time();
     for (int i = 0; i < all_annotations.size(); ++i) {
-        if (currentTimeStamp >= all_annotations[i].start_ts && currentTimeStamp <= all_annotations[i].end_ts) {
+        // TODO: check if this works so now with the Edge case...
+        // This is a long if because it has the two cases: start_ts <= end_ts and start_ts > end_ts and each case needs a different check
+        // for if the current time is in the time span
+        if ((all_annotations[i].start_ts <= all_annotations[i].end_ts &&
+            currentTimeStamp >= all_annotations[i].start_ts && currentTimeStamp <= all_annotations[i].end_ts)
+            ||
+            (all_annotations[i].end_ts < all_annotations[i].start_ts &&
+            (currentTimeStamp >= all_annotations[i].start_ts || currentTimeStamp <= all_annotations[i].end_ts)))
+        {
             showSphereAtPointIndex(call, this->all_annotations[i].coordinates, i);
-            this->all_annotations[i].point_at_current_time = true;
+            this->all_annotations[i].aviable_at_current_time = true;
 
             int t = (frameType + 1) % 2;
             if (occlusionQuery.queryStarted[2 * i + t]) {
@@ -972,11 +980,7 @@ void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
             }
         } else {
             this->all_annotations[i].show_point = false;
-            this->all_annotations[i].point_at_current_time = false;
-        }
-        if (this->all_annotations[i].show_point) {
-            display_visual_points_windows(
-                call, all_annotations[i].name, i, all_annotations[i].coordinates);
+            this->all_annotations[i].aviable_at_current_time = false;
         }
     }
 }
