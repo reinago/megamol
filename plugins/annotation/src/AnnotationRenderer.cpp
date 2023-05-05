@@ -461,7 +461,9 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     if (!valid_imgui_scope)
         return;
 
-    ImGui::Begin(window_name.c_str(), &window_open);
+    std::string windowNameString = window_name + std::string("##") + window_name;
+    bool* p_open = NULL; // for removing the x on the top right corner of the window
+    ImGui::Begin(windowNameString.c_str(), p_open);
     ImGui::InputText("Point Name", &this->annot_win_struct.point_name_input);
     ImGui::Text("Write your annotations here:");
     ImGui::InputText("Annotation", &this->annot_win_struct.annotation_input);
