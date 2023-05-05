@@ -561,11 +561,15 @@ void AnnotationRenderer::save_new_point_to_json(annotation_struct input) {
     json_obj["Points"][json_amount - 1] = {
         {"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
         {"Annotation", input.annotation},
-        {"Point Number", json_amount},// to be able to get the correct number of the point again later TODO: is this really needed?
+        {"Point Number", json_amount}, // to be able to get the correct number of the point again later TODO: is this really needed?
         {"Point Name", input.name},
         {"Show Window", false},
+        {"Show Point", false},
+        {"Point Time Visible", false},
         {"Start Timestamp", input.start_ts},
-        {"End Timestamp", input.end_ts}
+        {"End Timestamp", input.end_ts},
+        {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
+        {"Camera Orientation", {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}
     };
 
     // Add entries to occlusionQuery and oqResults vectors:
@@ -672,18 +676,29 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(bool loaded_from_file) {
         int i = std::stoi(x.key());
         // Generate a temp value for the coordinates array, removes clutter in later calls.
         auto temp = x.value()["Coordinates"];
+        auto tempCamPos = x.value()["Camera Position"];
+        auto tempCamOrient = x.value()["Camera Orientation"];
 
         // in case that json_obj holds more points then
         if (i >= all_annotations.size()) {
-            this->all_annotations.push_back({x.value()["Annotation"], glm::vec3(temp[0], temp[1], temp[2]), x.value()["Point Name"],
-                    x.value()["Show Window"], x.value()["Start Timestamp"], x.value()["End Timestamp"]});
+            this->all_annotations.push_back(
+                {x.value()["Annotation"], glm::vec3(temp[0], temp[1], temp[2]), x.value()["Point Name"],
+                    x.value()["Show Window"], x.value()["Show Point"], x.value()["Point Time Visible"], x.value()["Start Timestamp"],
+                    x.value()["End Timestamp"], glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]),
+                    glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]), false});
         } else {
             this->all_annotations[i].annotation = x.value()["Annotation"];
             this->all_annotations[i].coordinates = glm::vec3(temp[0], temp[1], temp[2]);
             this->all_annotations[i].name = x.value()["Point Name"];
             this->all_annotations[i].show_window = x.value()["Show Window"];
+            this->all_annotations[i].show_point = x.value()["Show Point"];
+            this->all_annotations[i].aviable_at_current_time = x.value()["Point Time Visible"];
             this->all_annotations[i].start_ts = x.value()["Start Timestamp"];
             this->all_annotations[i].start_ts = x.value()["End Timestamp"];
+            this->all_annotations[i].cam_pos = glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]);
+            this->all_annotations[i].cam_orientation =
+                glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]); // 3,0,1,2 because quat in megamol is x,y,z,w and glm::quat is w,x,y,z
+            this->all_annotations[i].currently_editing = false;
         }
     }
     // Case that we have LESS points in json_obj then we have entries in all_annotations:

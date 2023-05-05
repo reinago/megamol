@@ -13,6 +13,7 @@
 #include <glowl/glowl.h>
 
 #include <nlohmann/json.hpp>
+#include "glm/gtx/quaternion.hpp" // glm::rotate(quat, vector)
 
 #include "mmcore/CalleeSlot.h"
 #include "mmcore/CallerSlot.h"
@@ -36,11 +37,17 @@ struct annotation_struct {
     // Bool for showing the current point in the 3D view
     bool show_point;
     // Bool for showing if the current point might be visible at the current time
-    bool point_at_current_time;
+    bool aviable_at_current_time;
     // Start Timestamp of the annotation
     float start_ts;
     // End Timestamp of the annotation
     float end_ts;
+    // Current camera position
+    glm::vec3 cam_pos;
+    // Current camera orientation
+    glm::quat cam_orientation;
+
+    bool currently_editing;
 };
 
 // Struct for saving all variables that are needed for the "Adding Annotation" Window
