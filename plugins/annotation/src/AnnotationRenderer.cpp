@@ -635,6 +635,8 @@ void AnnotationRenderer::update_point_in_json(
     // update the json object
     this->json_obj["Points"][point_index]["Coordinates"] = {coords.x, coords.y, coords.z}; // update the Coordinates
     this->json_obj["Points"][point_index]["Annotation"] = annotation;                      // update the annotation
+    display_visual_points_windows(call, this->all_annotations[point_index].name, point_index,
+        this->all_annotations[point_index].coordinates, glm::vec2(0.0f, 0.0f), false, true);
     std::cout << json_obj.dump(4) << std::endl;
 }
 
@@ -962,6 +964,7 @@ void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
             this->all_annotations[i].aviable_at_current_time = false;
         }
     }
+    forceDirectedLayout(call);
 }
 
 /*Converts the given 3D world coordinates into 2D screen coordinates.
@@ -1300,6 +1303,83 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
     ImGui::End();
 }
 
+
+/* Function that implements a sort of Spring Embedder for the Shown Annotations on screen to prevent overlapping. */
+void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
+    // Idea: Place first window as normal.
+    // Then, for every other window, check if it overlaps with the first window.
+    // If it does, move it to the right.
+    // Then, check if it overlaps with any other window.
+    // If it does, move it to the right.
+    // Repeat until no overlap is detected.
+    // Then, place the next window as normal.
+    // Repeat until all windows are placed.
+    struct tempStruct {
+        int indexAllAnnot;        // index of the annotation in the all_annotations vector
+        glm::vec2 screenPosition; // screen position of the annotation (middle point)
+        glm::vec2 windowSize;     // window size of the ImGui window
+        glm::vec2 offset;         // offset for the current loop
+        glm::vec2 totalOffset;    // offset that is sum of all offets
+    };
+
+    std::vector<tempStruct> tempStructVector;
+
+    for (int i = 0; i < this->all_annotations.size(); i++) {
+        if (this->all_annotations[i].show_point) {
+            glm::vec2 currentPointScreenPos = getScreenPosFromWorldCoords(call, this->all_annotations[i].coordinates);
+            glm::vec2 currentPointScreenSize = pointWindowSizes[i];
+            tempStructVector.push_back(tempStruct{
+                i, currentPointScreenPos, currentPointScreenSize, glm::vec2(0.0f, 0.0f), glm::vec2(0.0f, 0.0f)});
+        }
+    }
+
+    // iterate over the triangle of all Windows that need to be placed...
+    for (int k = 0; k < 5; k++) {
+        for (int i = 0; i < tempStructVector.size(); i++) {
+            for (int j = i + 1; j < tempStructVector.size(); j++) {
+                float sumWidth = (tempStructVector[i].windowSize.x + tempStructVector[j].windowSize.x) * 0.5f;
+                float sumHeight = (tempStructVector[i].windowSize.y + tempStructVector[j].windowSize.y) * 0.5f;
+                float differenceX = tempStructVector[i].screenPosition.x - tempStructVector[j].screenPosition.x;
+                float differenceY = tempStructVector[i].screenPosition.y - tempStructVector[j].screenPosition.y;
+
+                if (std::abs(differenceX) <= sumWidth && std::abs(differenceY) <= sumHeight) {
+                    // Calculate left and right points of the rectangles
+                    glm::vec2 l1 = tempStructVector[i].screenPosition - (tempStructVector[i].windowSize * 0.5f);
+                    glm::vec2 r1 = tempStructVector[i].screenPosition + (tempStructVector[i].windowSize * 0.5f);
+                    glm::vec2 l2 = tempStructVector[j].screenPosition - (tempStructVector[j].windowSize * 0.5f);
+                    glm::vec2 r2 = tempStructVector[j].screenPosition + (tempStructVector[j].windowSize * 0.5f);
+
+                    // Calculate Offsets
+                    float x_dist = std::min(r1.x, r2.x) - std::max(l1.x, l2.x);
+                    float y_dist = (std::min(r1.y, r2.y) - std::max(l1.y, l2.y));
+
+                    if (differenceX >= 0.0f && differenceY >= 0.0f) { // i is on the right and up?
+                        tempStructVector[i].offset += glm::vec2(x_dist * 0.5f, y_dist * 0.5f);
+                        tempStructVector[j].offset += glm::vec2(x_dist * -0.5f, y_dist * -0.5f);
+                    } else if (differenceX < 0.0f && differenceY >= 0.0f) { // i is on the left and up?
+                        tempStructVector[i].offset += glm::vec2(x_dist * -0.5f, y_dist * 0.5f);
+                        tempStructVector[j].offset += glm::vec2(x_dist * 0.5f, y_dist * -0.5f);
+                    } else if (differenceX >= 0.0f && differenceY >= 0.0f) { // i is on the right and down?
+                        tempStructVector[i].offset += glm::vec2(x_dist * 0.5f, y_dist * -0.5f);
+                        tempStructVector[j].offset += glm::vec2(x_dist * -0.5f, y_dist * 0.5f);
+                    } else { // i is on the left and down?
+                        tempStructVector[i].offset += glm::vec2(x_dist * -0.5f, y_dist * -0.5f);
+                        tempStructVector[j].offset += glm::vec2(x_dist * 0.5f, y_dist * 0.5f);
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < tempStructVector.size(); i++) {
+            tempStructVector[i].screenPosition += tempStructVector[i].offset;
+            tempStructVector[i].totalOffset += tempStructVector[i].offset;
+            tempStructVector[i].offset = glm::vec2(0.0f, 0.0f);
+        }
+    }
+    for (int i = 0; i < tempStructVector.size(); i++) {
+        int index = tempStructVector[i].indexAllAnnot;
+        display_visual_points_windows(call, this->all_annotations[index].name, index, this->all_annotations[index].coordinates, tempStructVector[i].totalOffset, true, true);
+    }
+}
 
 /* Function that draws a connection line between an ImGui window and the given coordinates in 3D. */
 void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos) {

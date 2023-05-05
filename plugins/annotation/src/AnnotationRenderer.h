@@ -254,6 +254,9 @@ private:
 
     void list_Window(megamol::mmstd_gl::CallRender3DGL& call);
 
+    void forceDirectedLayout(
+        megamol::mmstd_gl::CallRender3DGL& call);
+
     void drawConnectionLine(megamol::mmstd_gl::CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos);
 
     glm::vec3 getWorldCoordsFromScreenPos(megamol::mmstd_gl::CallRender3DGL& call, int x, int y, float z, bool flipY);
