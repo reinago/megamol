@@ -324,66 +324,6 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
     return renderRes;
 }
 
-/*
-* Main function. OLD!!!
-* This function generates the main ImGui window and allows the opening of all other windows.
-*/
-void AnnotationRenderer::test(CallRender3DGL &call) {
-    bool valid_imgui_scope =
-        ((ImGui::GetCurrentContext() != nullptr) ? (ImGui::GetCurrentContext()->WithinFrameScope) : (false));
-    if (!valid_imgui_scope)
-        return;
-
-    // Creates a Window with the slider
-    ImGui::Begin("Basic Functions");
-
-    ImGui::InputFloat3("input coordinates", this->first_win_coordinates_input);
-    glm::vec3 first_win_coordinates =
-        glm::vec3(first_win_coordinates_input[0], first_win_coordinates_input[1], first_win_coordinates_input[2]);
-
-    /* TODO: COLOR does NOT yet work! */
-    // ImGui::InputFloat3("input Color", this->first_win_color_input);
-
-    if (ImGui::Button("print current coordinates to console"))
-        print_coords(first_win_coordinates);
-
-    if (ImGui::Button("Toggle Sphere")) {
-        if (this->tryOut) {
-            this->tryOut = false;
-        } else {
-            this->tryOut = true;
-        }
-    }
-
-    if (ImGui::Button("Show Create new Annotations Window")) {
-        this->anotherWindow = true;
-    }
-
-    if (ImGui::Button("Show Json Window")) {
-        this->show_json_window = true;
-    }
-
-    // Save the current state of the json_obj to a json file
-    if (ImGui::Button("Save annotations to Json File")) {
-        save_json_to_file();
-    }
-
-    if (anotherWindow) {
-        showAddingAnotationWindow(call, "Second Window", this->anotherWindow);
-    }
-
-    if (show_json_window) {
-        display_json_window(call);
-    }
-
-    if (this->tryOut) {
-        showSphereAtPoint(call, first_win_coordinates);
-    }
-    ImGui::End();
-
-
-}
-
 
 /*
  * Main function.
