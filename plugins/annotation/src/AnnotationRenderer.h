@@ -255,9 +255,13 @@ private:
 
     void showSphereAtPointIndex(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords, int index);
 
+    void list_Window(megamol::mmstd_gl::CallRender3DGL& call);
+
     void drawConnectionLine(megamol::mmstd_gl::CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos);
 
     glm::vec3 getWorldCoordsFromScreenPos(megamol::mmstd_gl::CallRender3DGL& call, int x, int y, float z, bool flipY);
+
+    void editing_Annotations_Window(megamol::mmstd_gl::CallRender3DGL& call, int index);
 
     /* Parameters */
     /** Slot for the scaling factor of the pointsize*/

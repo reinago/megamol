@@ -412,6 +412,12 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     } else {
          this->show_json_window = false;
     }
+
+    if (this->enableListWindowSlot.Param<core::param::BoolParam>()->Value()) {
+        list_Window(call);
+    }
+    
+
     // TODO: add some kind of Prompt for 
     if (this->loadJsonFromFileSlot.IsDirty()) {
         this->loadJsonFromFileSlot.ResetDirty();
@@ -1110,6 +1116,208 @@ void AnnotationRenderer::showSphereAtPointIndex(CallRender3DGL& call, glm::vec3 
     occlusionQuery.queryStarted[2 * index + frameType] = true;
     glDisable(GL_DEPTH_TEST);
 }
+
+/* ImGui Window that holds all annotations.
+ * This includes a list of all annotations  TODO: (and a text field to add new annotations.)
+ * TODO: Also a button to delete the selected annotation.
+ * A timeline next to each annotation that shows when the annotation is visible timewise
+ * Different colors for the names depending on if the annotation is visible in time and space.
+ */
+void AnnotationRenderer::list_Window(CallRender3DGL& call) {
+    // Using those as a base value to create width/height that are factor of the size of our font
+    const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
+    const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
+    bool* p_open = NULL;
+    ImGui::Begin("Annotation List", p_open);
+    // list all annotation names
+    //ImGui::BeginTabBar("#Lists");
+    //for (int i = 0; i < this->all_annotations.size(); i++) {
+
+    //}
+    // Taken From IMGUI DEMO:
+    // Just for seeing the code right now
+    static ImGuiTableFlags flags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH |
+                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg |
+                                   ImGuiTableFlags_NoBordersInBody;
+    static ImGuiTableFlags flags_Slider = 0;
+
+
+    ImGui::Text("Tooltips:");
+    ImGui::SmallButton("Visibility");
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        //std::string tooltipText = "There are three possible colors and names for the visibility of an Annotation.\n\n"
+        //                          "Visible - Green: This Annotation is visible on screen right now.\n"
+        //                          "Obscurred - Yellow: This Annotation is currently behind Objects in the scene.\n"
+        //                          "Hidden - Red: This Annotation is currently not visible in any way."; // TODO: maybe change these lines a bit...
+        //ImGui::TextUnformatted(tooltipText.c_str());
+        ImGui::TextUnformatted("There are three possible colors and names for the visibility of an Annotation.");
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Visible");
+        ImGui::SameLine();
+        ImGui::Text("This Annotation is visbile on screen right now.");
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Obscurred");
+        ImGui::SameLine();
+        ImGui::Text("This Annotation is currently behind Objects in the scene.");
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Hidden");
+        ImGui::SameLine();
+        ImGui::Text("This Annotation is currently not visible in any way.");
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    } // TODO: ADD COLORBLIND MODE!!!!
+        
+    ImGui::SameLine();
+    ImGui::SmallButton("Timeline");
+    if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+        std::string tooltipText = "The timeline is made up of 20 individual symbols that each represent 1/20 of the "
+                                  "total runtime of the animation.\n\n"
+                                  "To differenciate between parts, where an Annotation is visible and parts where it "
+                                  "is not, there are the following two symbols:\n\n"
+                                  "$: This symbol means that the Annotation is visible in this part of the animation.\n"
+                                  "=: This symbol means that the Annotation is not visible in this part of the animation.";
+        ImGui::TextUnformatted(tooltipText.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+
+    if (ImGui::BeginTable("3ways", 4, flags)) {
+        // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide);
+        ImGui::TableSetupColumn("Visibility", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 12.0f);
+        ImGui::TableSetupColumn("Timeline", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
+        ImGui::TableSetupColumn("Start Time", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
+        ImGui::TableHeadersRow();
+
+        // TODO: Allow sorting of entries!
+
+        // loop over all annotations in all_annotations
+        // entries will be: name, timeline
+        // collapsed for each entry: annotation text, change annotation, jump to annotation
+        for (int i = 0; i < this->all_annotations.size(); i++) {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            bool open = ImGui::TreeNodeEx(this->all_annotations[i].name.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
+            
+            ImGui::TableNextColumn();
+            std::string text1 = "";
+            ImVec4 color1 = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+            if (this->all_annotations[i].show_point) {
+                text1 = "Visible";
+                color1 = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // green
+            } else if (this->all_annotations[i].aviable_at_current_time) {
+                text1 = "Obscurred";
+                color1 = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); // yellow
+            } else {
+                text1 = "Hidden"; // TODO: better word... it is after all not just hidden, but also just not in the current timeframe...
+                color1 = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // red
+            }
+            ImGui::TextColored(color1, text1.c_str());
+            
+            ImGui::TableNextColumn();
+            // ImGui::TextDisabled("--");
+            // std::string tempText = createTimelineArt(call, this->all_annotations[i].start_ts, this->all_annotations[i].end_ts);
+            // ImGui::Text(tempText.c_str());
+
+            // float xs1[] = {this->all_annotations[i].start_ts, this->all_annotations[i].end_ts};
+            // float ys1[] = {0.5f, 0.5f};
+            // if (ImPlot::BeginPlot("Line Plots")) {
+            //     ImPlot::SetupAxes("x", "y");
+            //     ImPlot::PlotLine("f(x)", xs1, ys1, ImPlotLineFlags_Segments);
+            //     ImPlot::EndPlot();
+            // }
+
+            // TODO: Get this to display a function that is 1 when inside the time intervall and 0 otherwise...
+            float arr[] = {0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f, (float)i};
+            ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));
+            
+            ImGui::TableNextColumn();
+            // show start time, for sorting
+            // TODO: allow sorting in the table
+            ImGui::Text(std::to_string(this->all_annotations[i].start_ts).c_str());
+            if (open) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextWrapped(this->all_annotations[i].annotation.c_str());
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (ImGui::Button("Load Camera Position")) {
+                    loadCameraPosition(
+                        call, this->all_annotations[i].cam_pos, this->all_annotations[i].cam_orientation);
+                }
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (ImGui::Button("Load Time Position")) {
+                    auto thingy = const_cast<frontend_resources::common_types::lua_func_type*>(
+                        &frontend_resources.get<frontend_resources::common_types::lua_func_type>());
+                    std::string tttt = " mmSetParamValue(\"::view::anim::time\", [=[" +
+                                       std::to_string(this->all_annotations[i].start_ts) + "]=])";
+                    (*thingy)(tttt);
+                    // TODO: Set Time does not work this way?
+                }
+                std::string open_string = "Open Change Options##" + std::to_string(i);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                //bool open_changes = ImGui::TreeNodeEx(open_string.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
+                //if (open_changes) {
+                //    ImGui::TableNextRow();
+                //    ImGui::TableNextColumn();
+                //    ImGui::Text("Change Annotation");
+                //    ImGui::TableNextColumn();
+                //    ImGui::InputText("Annotation", &this->all_annotations[i].annotation);
+                //    //ImGui::Text(this->all_annotations[i].annotation.c_str());
+                //    ImGui::TableNextRow();
+                //    ImGui::TableNextColumn();
+                //    ImGui::Text("Change Coordinate of Point");
+                //    ImGui::TableNextColumn();
+                //    // Button for starting the picking process
+                //    if (ImGui::Button("Click in the viewport to add a new point##2")) {
+                //        this->picking_enabled = true;
+                //    }
+
+                //    if (this->picking_enabled) {
+                //    ImGui::Text("Click in the viewport to add a new point");
+                //    // Wait till the user has clicked in the Window and then calculate the coordinates from this point.
+                //    // this uses the variables lastX and lastY that are updated everytime the mouse is moved.
+                //    if (this->picked_a_point) {
+                //        glm::vec3 picked_point = calcClickedPoint(this->lastX, this->lastY, call);
+                //        // are these texts even needed? because they will just vanish after 1 frame
+                //        ImGui::Text("Picked a point!");
+                //        ImGui::Text("x: %f, y: %f, z: %f", picked_point.x, picked_point.y, picked_point.z);
+                //        this->annot_win_struct.annot_struct.coordinates = picked_point;
+                //        // this conversion is needed to show the coordinates in the ImGui window
+                //        this->all_annotations[i].coordinates = picked_point;
+                //        this->picked_a_point = false;
+                //        this->picking_enabled = false;
+                //        }
+                //    }
+                //    
+                //    if (ImGui::Button("Update the json_obj with current values")) {
+                //        update_point_in_json(this->all_annotations[i].coordinates,
+                //            this->all_annotations[i].annotation, i); // TODO: add struct as import => can change as wanted
+                //    }
+                //    ImGui::TreePop();
+                //}
+
+                if (ImGui::Button("Edit this Annotation")) {
+                    this->all_annotations[i].currently_editing = true;
+                }
+                if (this->all_annotations[i].currently_editing) {
+                    editing_Annotations_Window(call, i);
+                }
+                    
+
+                ImGui::TreePop();
+            }
+        }
+        ImGui::EndTable();
+    }
+
+    ImGui::End();
+}
+
+
 /* Function that draws a connection line between an ImGui window and the given coordinates in 3D. */
 void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos) {
     // TODO: add variable for changing the line color?
@@ -1141,3 +1349,57 @@ void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 wind
     glEnd();
     glDisable(GL_DEPTH_TEST);
 }
+void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int index) {
+    ImGuiWindowFlags window_flags = 0;
+    // bool* p_open = NULL;
+    // TODO: Window will be "overwritten" when a "normal" window of the same annotation is opened...
+    std::string windowNameString =
+        "Editing Annotation: " + this->all_annotations[index].name + std::string("##") +
+        std::to_string(index); // Needed to differenciate between this window and the other windows (does not work)
+    float wrap_width = this->wrappWidthSlot.Param<core::param::FloatParam>()->Value();
+
+    // ImGui::SetNextWindowPos(ImVec2(screenPos.x, screenPos.y), 0, ImVec2(0.5f, 0.5f));
+
+    ImGui::Begin(windowNameString.c_str(), &this->all_annotations[index].currently_editing , window_flags);
+    ImGui::Text("Change Annotation");
+    ImGui::InputText("Annotation", &this->all_annotations[index].annotation);
+    //ImGui::Text(this->all_annotations[i].annotation.c_str());
+    ImGui::Text("Change Coordinate of Point");
+    // Button for starting the picking process
+    if (ImGui::Button("Click in the viewport##2")) { // TODO: change description of this Button?
+        this->picking_enabled = true;
+    }
+
+    if (this->picking_enabled) {
+        ImGui::Text("Click in the viewport to add a new point");
+        // Wait till the user has clicked in the Window and then calculate the coordinates from this point.
+        // this uses the variables lastX and lastY that are updated everytime the mouse is moved.
+        if (this->picked_a_point) {
+            glm::vec3 picked_point = calcClickedPoint(this->lastX, this->lastY, call);
+            // are these texts even needed? because they will just vanish after 1 frame
+            ImGui::Text("Picked a point!");
+            ImGui::Text("x: %f, y: %f, z: %f", picked_point.x, picked_point.y, picked_point.z);
+            this->annot_win_struct.annot_struct.coordinates = picked_point;
+            // this conversion is needed to show the coordinates in the ImGui window
+            this->all_annotations[index].coordinates = picked_point;
+            this->picked_a_point = false;
+            this->picking_enabled = false;
+        }
+    }
+
+    // Button for saving the current camera position
+    if (ImGui::Button("Update camera to current camera position")) { // TODO: better wording?
+        this->all_annotations[index].cam_pos = call.GetCamera().getPose().position;
+        this->all_annotations[index].cam_orientation = call.GetCamera().getPose().to_quat();
+    }
+
+    if (ImGui::Button("Update the json_obj with current values")) { // TODO: this is USELESS!!!! because any changes are already being done the moment they happen.
+        update_point_in_json(call, this->all_annotations[index].coordinates, this->all_annotations[index].annotation,
+            index); // TODO: add struct as import => can change as wanted
+    }
+    ImVec2 currWinPos = ImGui::GetWindowPos();
+    drawConnectionLine(call, glm::vec2(currWinPos.x, currWinPos.y), this->all_annotations[index].coordinates);
+    ImGui::End();
+}
+
+
