@@ -82,7 +82,6 @@ AnnotationRenderer::AnnotationRenderer()
         , tryOut(false)
         , anotherWindow(false)
         , annot_win_struct()
-        , warning_popup_bool(false)
         , show_json_window(false)
         , json_file_path()
         , json_point_name_selectedIndex(0)
@@ -802,28 +801,6 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
     ImGui::End();
 }
 
-/* Makes a popup in the current frame with a warning message.
-It sets the value of warning_popup_bool to false when a button is pressed. */
-void AnnotationRenderer::warning_popup() {
-    ImGui::OpenPopup("Warning");
-    if (ImGui::BeginPopupModal("Warning", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-        // TODO: make the warning popup more general... (add warning text and possible functions as inputs)
-        ImGui::Text("Do you want to load the json file?\nThis will overwrite any current data that was not saved.\n\n");
-        ImGui::Separator();
-
-        if (ImGui::Button("YES", ImVec2(120, 0))) {
-            load_json_from_file();
-            warning_popup_bool = false;
-            ImGui::CloseCurrentPopup();
-        }
-        if (ImGui::Button("NO", ImVec2(120, 0))) {
-            warning_popup_bool = false;
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
-    }
-
-}
 
 /* Loads the json file that is found under its path into the json_obj and the vector all_annotatins */
 void AnnotationRenderer::load_json_from_file(CallRender3DGL& call) {

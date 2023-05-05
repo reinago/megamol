@@ -225,9 +225,6 @@ private:
     void update_point_in_json(
         megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords, std::string annotation, int point_index);
 
-    // void warning_popup(std::string warning_message);
-    void warning_popup();
-
     void load_json_from_file(megamol::mmstd_gl::CallRender3DGL& call);
 
     void save_json_to_file();
@@ -342,8 +339,6 @@ private:
     annot_window_struct annot_win_struct;
 
     std::vector<glm::vec2> pointWindowSizes;
-    
-    bool warning_popup_bool;
 
     bool grh;
 
