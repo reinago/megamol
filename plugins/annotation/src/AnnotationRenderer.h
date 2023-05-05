@@ -253,6 +253,12 @@ private:
 
     core::param::ParamSlot linesColorSlot;
 
+    /* Slot for enabling the drawing with Fonts */
+    core::param::ParamSlot drawTextSlot;
+
+    /*Slot for setting the Text Scaling of Fonts */
+    core::param::ParamSlot textScalingSlot;
+
     // gives the depth buffer to the renderer
     // megamol::core::CallerSlot get_depth_buffer;
 
@@ -264,7 +270,17 @@ private:
 
     core::param::ParamSlot saveJsonToFileSlot;
 
+    /* Slot for enabling the Window for adding new Annotations */
+    core::param::ParamSlot enableAddingAnnotationWindowSlot;
 
+    /* Slot for enabling the Window for JSON things */
+    core::param::ParamSlot enableJsonWindowSlot;
+
+    /* Slot for enabling the Window for showing the list with all Annotations */
+    core::param::ParamSlot enableListWindowSlot;
+
+    core::param::ParamSlot wrappWidthSlot;
+    
     /*
     VARIABLES
     */

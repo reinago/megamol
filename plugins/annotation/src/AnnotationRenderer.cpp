@@ -53,10 +53,16 @@ AnnotationRenderer::AnnotationRenderer()
         , sizeScalingSlot("scaling factor", "Scaling factor for the size of the rendered GL_POINTS")
         , linesColorSlot("linesColor", "Color of the Connection Lines between Annotation and Point in 3D")
         , sphereColorSlot("sphereColor", "Color of the Spheres that show the position of the annotations")
+        , drawTextSlot("Draw 3D Text", "Enables the drawing of a 3D Text for each Annotation")
+        , textScalingSlot("text scaling factor", "Scaling factor for the size of the rendered 3D Text")
         , saveSlotValuesSlot("saveSlotValues", "Saves the current values of the slots")
         , loadSlotValuesSlot("loadSlotValues", "Loades the saved values of the slots")
         , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
         , loadJsonFromFileSlot("loadJsonFromFile", "Loads the state of the Annotation from a Json File")
+        , enableAddingAnnotationWindowSlot("Adding Annotations Window", "Enables the Window for adding new Annotations")
+        , enableJsonWindowSlot("Json Window", "Enables the Window for handling saved Annotations") //TODO: better description + name
+        , enableListWindowSlot("List Window", "Enables the Window that shows the list of all Annotations")
+        , wrappWidthSlot("Wrapping Width for Annotations", "Sets the value for the width of the wrapping of the Annotations")
         , vbo(0)
         , ibo(0)
         , va(0)
@@ -95,6 +101,13 @@ AnnotationRenderer::AnnotationRenderer()
     
     this->sphereColorSlot.SetParameter(new core::param::ColorParam("#ffffffff"));
     this->MakeSlotAvailable(&this->sphereColorSlot);
+
+    this->drawTextSlot.SetParameter(new core::param::BoolParam(true));
+    this->MakeSlotAvailable(&this->drawTextSlot);
+    
+    this->textScalingSlot.SetParameter(new core::param::FloatParam(1.0f));
+    this->MakeSlotAvailable(&this->textScalingSlot);
+    
     this->saveSlotValuesSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
     this->MakeSlotAvailable(&this->saveSlotValuesSlot);
@@ -111,6 +124,17 @@ AnnotationRenderer::AnnotationRenderer()
         new core::param::ButtonParam(core::view::Key::KEY_D, core::view::Modifier::SHIFT));
     this->MakeSlotAvailable(&this->saveJsonToFileSlot);
 
+    this->enableAddingAnnotationWindowSlot.SetParameter(new core::param::BoolParam(false));
+    this->MakeSlotAvailable(&this->enableAddingAnnotationWindowSlot);
+
+    this->enableJsonWindowSlot.SetParameter(new core::param::BoolParam(false));
+    this->MakeSlotAvailable(&this->enableJsonWindowSlot);
+
+    this->enableListWindowSlot.SetParameter(new core::param::BoolParam(false));
+    this->MakeSlotAvailable(&this->enableListWindowSlot);
+
+    this->wrappWidthSlot.SetParameter(new core::param::FloatParam(15.0f));
+    this->MakeSlotAvailable(&this->wrappWidthSlot); // TODO: maybe do this wrapWidthSlot with a slider?
 
     this->json_obj["Points"];
     this->json_obj["Slot Values"];
