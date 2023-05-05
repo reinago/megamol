@@ -25,6 +25,14 @@
 #include "ScriptPaths.h"
 
 #include "FrontendResource.h"
+
+
+#include "imgui.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui_internal.h"
+#include "imgui_stdlib.h"
+#include "imgui_tex_inspect.h"
+
 // struct annotation_struct with glm::vec3 coordinates, std::string annotation, std::string name, bool show_window
 struct annotation_struct {
     // Annotation of the current point
@@ -240,6 +248,11 @@ private:
 
     glm::vec2 getScreenPosFromWorldCoords(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 input_coords);
 
+    void display_visual_points_windows(megamol::mmstd_gl::CallRender3DGL& call, std::string windowName, int curr_index,
+        glm::vec3 point_pos, glm::vec2 offset = glm::vec2(0.0f, 0.0f), bool drawLine = true, bool saveSize = false);
+
+
+
     void showSphereAtPointIndex(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords, int index);
 
     void drawConnectionLine(megamol::mmstd_gl::CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos);
@@ -324,7 +337,8 @@ private:
     //annotation_struct annot_win_struct;
     annot_window_struct annot_win_struct;
 
-
+    std::vector<glm::vec2> pointWindowSizes;
+    
     bool warning_popup_bool;
 
     bool grh;

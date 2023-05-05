@@ -32,6 +32,7 @@
 #include "CommonTypes.h"
 
 #include "imgui.h"
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
 #include "imgui_tex_inspect.h"
@@ -43,7 +44,6 @@ using namespace megamol::core::utility;
 
 using namespace megamol::annotation;
 struct annotation_struct;
-
 /*
  * AnnotationRenderer::AnnotationRenderer
  */
@@ -75,6 +75,7 @@ AnnotationRenderer::AnnotationRenderer()
         , lastX()
         , lastY()
         , my_color()
+        , pointWindowSizes()
         , first_win_coordinates_input()
         , first_win_color_input()
         , first_win_color()
@@ -701,9 +702,12 @@ void AnnotationRenderer::display_json_window(CallRender3DGL& call) {
 
 /* Writes the Names of the currently stored Points in the json_obj to a vector
 Add a bool of true, if this function is called after loading a file, this will reset all stored window-bools */
-    if (loaded_from_file)
 void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bool loaded_from_file) {
+    if (loaded_from_file) {
         all_annotations.clear(); // when loading from a file then first clear the vector.
+        this->pointWindowSizes.clear();
+    }
+        
 
     int iterate = 0;
     for (auto& x : this->json_obj["Points"].items()) {
@@ -721,6 +725,8 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
                     x.value()["Show Window"], x.value()["Show Point"], x.value()["Point Time Visible"], x.value()["Start Timestamp"],
                     x.value()["End Timestamp"], glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]),
                     glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]), false});
+            // For saving the window Sizes
+            this->pointWindowSizes.push_back(glm::vec2(0.0f, 0.0f));
         } else {
             this->all_annotations[i].annotation = x.value()["Annotation"];
             this->all_annotations[i].coordinates = glm::vec3(temp[0], temp[1], temp[2]);
@@ -734,7 +740,15 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
             this->all_annotations[i].cam_orientation =
                 glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]); // 3,0,1,2 because quat in megamol is x,y,z,w and glm::quat is w,x,y,z
             this->all_annotations[i].currently_editing = false;
+            // For saving the window Sizes
+            this->pointWindowSizes[i] = glm::vec2(0.0f, 0.0f);
         }
+        // generates the window for one frame and then saves the size of it to the vector: pointWindowSizes[i]
+        // display_visual_points_windows(call, this->all_annotations[i].name, i, this->all_annotations[i].coordinates, ImVec2(0.0f,0.0f), false, true);
+    }
+    for (int i = 0; i < pointWindowSizes.size(); ++i) {
+        display_visual_points_windows(call, this->all_annotations[i].name, i, this->all_annotations[i].coordinates,
+            glm::vec2(0.0f, 0.0f), false, true);
     }
     // Case that we have LESS points in json_obj then we have entries in all_annotations:
     // TODO: check if this works, need the remove from json_obj function for this.
@@ -1006,6 +1020,57 @@ glm::vec3 AnnotationRenderer::getWorldCoordsFromScreenPos(CallRender3DGL& call, 
     glm::vec3 result = glm::vec3(h) / h.w;
     return result;
 }
+
+/* Displays an ImGui Window at the position the corresponding point is located.
+ * It shows the name of the point and its Annotation.
+ * It is fixed in place.
+ * It is only shown when the corresponding point is visible in the current frame.
+ */
+void AnnotationRenderer::display_visual_points_windows(
+    CallRender3DGL& call, std::string windowName, int curr_index, glm::vec3 point_pos, glm::vec2 offset, bool drawLine, bool saveSize) {
+    // check if the all_annotations vector is empty and if so then exit
+    if (this->all_annotations.empty())
+        return;
+    // check for index out of bounds
+    if (this->all_annotations.size() <= curr_index)
+        return;
+
+    glm::vec2 screenPos = getScreenPosFromWorldCoords(call, point_pos);
+    screenPos = screenPos + glm::vec2(offset.x, offset.y); // add offset to the screen position to prevent overlapping windows
+
+    ImGuiWindowFlags window_flags = 0;
+    window_flags |= ImGuiWindowFlags_NoBackground;
+    window_flags |= ImGuiWindowFlags_NoTitleBar;
+    window_flags |= ImGuiWindowFlags_NoResize;
+    bool* p_open = NULL;
+    std::string windowNameString = windowName + std::string("##") + std::to_string(curr_index); // Needed to differenciate between this window and the other windows
+    float wrap_width = this->wrappWidthSlot.Param<core::param::FloatParam>()->Value();
+    ImGui::SetNextWindowPos(ImVec2(screenPos.x, screenPos.y), 0, ImVec2(0.5f, 0.5f));
+    // ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 15.0f, 200.0f));
+    
+    ImGui::Begin(windowNameString.c_str(), p_open, window_flags);
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 15.0f); // TODO: change 15.0f out with: wrap_width
+    ImGui::TextUnformatted(windowName.c_str());
+    ImGui::TextUnformatted(this->all_annotations[curr_index].annotation.c_str());
+    ImGui::PopTextWrapPos();
+
+    // save the current window size
+    ImVec2 winSize = ImGui::GetWindowSize();
+    if (saveSize) {
+        pointWindowSizes[curr_index] = glm::vec2(winSize.x, winSize.y);
+    }
+    
+    // Drawing connecting line between Point and the center of the window:
+    if (drawLine) {
+        ImVec2 currWinPos = ImGui::GetWindowPos();
+        currWinPos.x = currWinPos.x + 0.5f * ImGui::GetWindowWidth();
+        currWinPos.y = currWinPos.y + 0.5f * ImGui::GetWindowHeight();
+        drawConnectionLine(call, glm::vec2(currWinPos.x, currWinPos.y), point_pos);
+    }
+    ImGui::End();
+}
+
+
 /* Draw a sphere at the coordinates given in the vec3
 * Additionally also start a glQuery of GL_ANY_SAMPLES_PASSED for these coordinates.
 * This is used to check if the drawn point is visible or not.
