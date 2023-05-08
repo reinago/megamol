@@ -999,46 +999,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
     static ImGuiTableFlags flags_Slider = 0;
 
 
-    ImGui::Text("Tooltips:");
-    ImGui::SmallButton("Visibility");
-    if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        //std::string tooltipText = "There are three possible colors and names for the visibility of an Annotation.\n\n"
-        //                          "Visible - Green: This Annotation is visible on screen right now.\n"
-        //                          "Obscurred - Yellow: This Annotation is currently behind Objects in the scene.\n"
-        //                          "Hidden - Red: This Annotation is currently not visible in any way."; // TODO: maybe change these lines a bit...
-        //ImGui::TextUnformatted(tooltipText.c_str());
-        ImGui::TextUnformatted("There are three possible colors and names for the visibility of an Annotation.");
-        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Visible");
-        ImGui::SameLine();
-        ImGui::Text("This Annotation is visbile on screen right now.");
-        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Obscurred");
-        ImGui::SameLine();
-        ImGui::Text("This Annotation is currently behind Objects in the scene.");
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Hidden");
-        ImGui::SameLine();
-        ImGui::Text("This Annotation is currently not visible in any way.");
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    } // TODO: ADD COLORBLIND MODE!!!!
-        
-    ImGui::SameLine();
-    ImGui::SmallButton("Timeline");
-    if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-        std::string tooltipText = "The timeline is made up of 20 individual symbols that each represent 1/20 of the "
-                                  "total runtime of the animation.\n\n"
-                                  "To differenciate between parts, where an Annotation is visible and parts where it "
-                                  "is not, there are the following two symbols:\n\n"
-                                  "$: This symbol means that the Annotation is visible in this part of the animation.\n"
-                                  "=: This symbol means that the Annotation is not visible in this part of the animation.";
-        ImGui::TextUnformatted(tooltipText.c_str());
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
-
     if (ImGui::BeginTable("3ways", 4, flags)) {
         // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide);
@@ -1049,6 +1009,50 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
 
         // TODO: Allow sorting of entries!
 
+        // This is a line for the Explanations of the different columns
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::Text("Tooltips:");
+        ImGui::TableNextColumn();
+        ImGui::SmallButton("Visibility");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            //std::string tooltipText = "There are three possible colors and names for the visibility of an Annotation.\n\n"
+            //                          "Visible - Green: This Annotation is visible on screen right now.\n"
+            //                          "Obscurred - Yellow: This Annotation is currently behind Objects in the scene.\n"
+            //                          "Hidden - Red: This Annotation is currently not visible in any way."; // TODO: maybe change these lines a bit...
+            //ImGui::TextUnformatted(tooltipText.c_str());
+            ImGui::TextUnformatted("There are three possible colors and names for the visibility of an Annotation.");
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Visible");
+            ImGui::SameLine();
+            ImGui::Text("This Annotation is visbile on screen right now.");
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Obscurred");
+            ImGui::SameLine();
+            ImGui::Text("This Annotation is currently behind Objects in the scene.");
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Hidden");
+            ImGui::SameLine();
+            ImGui::Text("This Annotation is currently not visible in any way.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        } // TODO: ADD COLORBLIND MODE!!!!
+
+        ImGui::TableNextColumn();
+        int amountLines = 100.0f;
+        float currentTime = call.Time();
+        float timeSpan = this->totalFrameCount / (float)amountLines;
+        int currentTimeL = currentTime / timeSpan;
+        float arr[100];
+        for (int i = 0; i < amountLines; i++) {
+            if (i == (int)currentTimeL) {
+                arr[i] = 1.0f;
+            } else {
+                arr[i] = 0.0f;
+            }
+        }
+
+        ImGui::PlotLines("", arr, IM_ARRAYSIZE(arr));
+        
         // loop over all annotations in all_annotations
         // entries will be: name, timeline
         // collapsed for each entry: annotation text, change annotation, jump to annotation
@@ -1077,17 +1081,30 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
             // std::string tempText = createTimelineArt(call, this->all_annotations[i].start_ts, this->all_annotations[i].end_ts);
             // ImGui::Text(tempText.c_str());
 
-            // float xs1[] = {this->all_annotations[i].start_ts, this->all_annotations[i].end_ts};
-            // float ys1[] = {0.5f, 0.5f};
-            // if (ImPlot::BeginPlot("Line Plots")) {
-            //     ImPlot::SetupAxes("x", "y");
-            //     ImPlot::PlotLine("f(x)", xs1, ys1, ImPlotLineFlags_Segments);
-            //     ImPlot::EndPlot();
-            // }
+            float startTime = this->all_annotations[i].start_ts;
+            float endTime = this->all_annotations[i].end_ts;
 
-            // TODO: Get this to display a function that is 1 when inside the time intervall and 0 otherwise...
-            float arr[] = {0.6f, 0.1f, 1.0f, 0.5f, 0.92f, 0.1f, 0.2f, (float)i};
-            ImGui::PlotLines("Frame Times", arr, IM_ARRAYSIZE(arr));
+            float startLine = startTime / timeSpan;
+            float endLine = endTime / timeSpan;
+
+            float xs5[100];
+            for (int k = 0; k < amountLines; k++) {
+                
+                if (startTime <= endTime) {
+                    if (k >= startLine && k <= endLine) {
+                        xs5[k] = 1.0f;
+                    } else {
+                        xs5[k] = 0.0f;
+                    }
+                } else if (startTime > endTime) {
+                    if (k >= endLine && k <= startLine) {
+                        xs5[k] = 1.0f;
+                    } else {
+                        xs5[k] = 0.0f;
+                    }
+                }
+            }
+            ImGui::PlotLines("", xs5, IM_ARRAYSIZE(xs5));
             
             ImGui::TableNextColumn();
             // show start time, for sorting
@@ -1283,6 +1300,7 @@ void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 wind
     glEnd();
     glDisable(GL_DEPTH_TEST);
 }
+
 void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int index) {
     ImGuiWindowFlags window_flags = 0;
     // bool* p_open = NULL;
