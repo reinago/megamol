@@ -269,8 +269,11 @@ private:
     /* Slot for enabling the drawing with Fonts */
     core::param::ParamSlot drawTextSlot;
 
-    /*Slot for setting the Text Scaling of Fonts */
-    core::param::ParamSlot textScalingSlot;
+    /* Slot for changing the Color of the Text of drawn Annotations */
+    core::param::ParamSlot textColorSlot;
+
+    /* Slot for changing the Color of the Title of drawn Annotations */
+    core::param::ParamSlot titleColorSlot;
 
     // gives the depth buffer to the renderer
     // megamol::core::CallerSlot get_depth_buffer;

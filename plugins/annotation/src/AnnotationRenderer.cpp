@@ -54,7 +54,8 @@ AnnotationRenderer::AnnotationRenderer()
         , linesColorSlot("linesColor", "Color of the Connection Lines between Annotation and Point in 3D")
         , sphereColorSlot("sphereColor", "Color of the Spheres that show the position of the annotations")
         , drawTextSlot("Draw 3D Text", "Enables the drawing of a 3D Text for each Annotation")
-        , textScalingSlot("text scaling factor", "Scaling factor for the size of the rendered 3D Text")
+        , titleColorSlot("Title Color", "Color for the title of Annotations")
+        , textColorSlot("Text Color", "Color for the shown Annotations in the Data")
         , saveSlotValuesSlot("saveSlotValues", "Saves the current values of the slots")
         , loadSlotValuesSlot("loadSlotValues", "Loades the saved values of the slots")
         , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
@@ -105,8 +106,11 @@ AnnotationRenderer::AnnotationRenderer()
     this->drawTextSlot.SetParameter(new core::param::BoolParam(true));
     this->MakeSlotAvailable(&this->drawTextSlot);
     
-    this->textScalingSlot.SetParameter(new core::param::FloatParam(1.0f));
-    this->MakeSlotAvailable(&this->textScalingSlot);
+    this->titleColorSlot.SetParameter(new core::param::ColorParam("#ffffffff"));
+    this->MakeSlotAvailable(&this->titleColorSlot);
+    
+    this->textColorSlot.SetParameter(new core::param::ColorParam("#ffffffff"));
+    this->MakeSlotAvailable(&this->textColorSlot);
     
     this->saveSlotValuesSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
@@ -761,19 +765,21 @@ glm::vec3 AnnotationRenderer::calcClickedPoint(int x, int y, CallRender3DGL& cal
  * It saves the current values of the slots to the json file.
  */
 void AnnotationRenderer::save_slot_values_to_json() {
-    this->json_obj["SlotValues"]["textScaling"] = this->textScalingSlot.Param<core::param::FloatParam>()->Value();
     this->json_obj["SlotValues"]["linesColor"] = this->linesColorSlot.Param<core::param::ColorParam>()->Value();
     this->json_obj["SlotValues"]["sphereColor"] = this->sphereColorSlot.Param<core::param::ColorParam>()->Value();
     this->json_obj["SlotValues"]["sphereSizeScaling"] = this->sizeScalingSlot.Param<core::param::FloatParam>()->Value();
+    this->json_obj["SlotValues"]["textColor"] = this->textColorSlot.Param<core::param::ColorParam>()->Value();
+    this->json_obj["SlotValues"]["titleColor"] = this->titleColorSlot.Param<core::param::ColorParam>()->Value();
 }
 
 /* Load the Slot Values from the JSON
  */
 void AnnotationRenderer::load_slot_values_from_json() {
-    this->textScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["textScaling"]);
     this->linesColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["linesColor"]);
     this->sphereColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["sphereColor"]);
     this->sizeScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["sphereSizeScaling"]);
+    this->titleColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["titleColor"]);
+    this->textColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["textColor"]);
 }
 
 /* Set the Camera to the given Coordinates
@@ -910,11 +916,18 @@ void AnnotationRenderer::display_visual_points_windows(
     float wrap_width = this->wrappWidthSlot.Param<core::param::FloatParam>()->Value();
     ImGui::SetNextWindowPos(ImVec2(screenPos.x, screenPos.y), 0, ImVec2(0.5f, 0.5f));
     // ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 15.0f, 200.0f));
+
+    auto textColorIn = this->textColorSlot.Param<core::param::ColorParam>()->Value();
+    ImVec4 textColor = ImVec4(textColorIn[0], textColorIn[1], textColorIn[2], textColorIn[3]);
+
+    auto titleColorIn = this->titleColorSlot.Param<core::param::ColorParam>()->Value();
+    ImVec4 titleColor = ImVec4(titleColorIn[0], titleColorIn[1], titleColorIn[2], titleColorIn[3]);
     
     ImGui::Begin(windowNameString.c_str(), p_open, window_flags);
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 15.0f); // TODO: change 15.0f out with: wrap_width
-    ImGui::TextUnformatted(windowName.c_str());
-    ImGui::TextUnformatted(this->all_annotations[curr_index].annotation.c_str());
+    ImGui::TextColored(titleColor, windowName.c_str());
+    //ImGui::TextUnformatted(windowName.c_str());
+    ImGui::TextColored(textColor, this->all_annotations[curr_index].annotation.c_str());
     ImGui::PopTextWrapPos();
 
     // save the current window size
