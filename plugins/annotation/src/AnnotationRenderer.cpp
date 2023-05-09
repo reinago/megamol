@@ -1077,7 +1077,8 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
         for (int i = 0; i < this->all_annotations.size(); i++) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            bool open = ImGui::TreeNodeEx(this->all_annotations[i].name.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
+            std::string treeNodeName = this->all_annotations[i].name + "##" + std::to_string(i);
+            bool open = ImGui::TreeNodeEx(treeNodeName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
             
             ImGui::TableNextColumn();
             std::string text1 = "";
@@ -1321,15 +1322,19 @@ void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 wind
 
 void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int index) {
     ImGuiWindowFlags window_flags = 0;
-    // bool* p_open = NULL;
-    // TODO: Window will be "overwritten" when a "normal" window of the same annotation is opened...
+    
     std::string windowNameString =
         "Editing Annotation: " + this->all_annotations[index].name + std::string("##") +
         std::to_string(index); // Needed to differenciate between this window and the other windows (does not work)
-
+    float wrap_width = this->wrapWidthSlot.Param<core::param::FloatParam>()->Value();
+    
     ImGui::Begin(windowNameString.c_str(), &this->all_annotations[index].currently_editing , window_flags);
     ImGui::Text("Change Annotation");
     ImGui::InputText("Annotation", &this->all_annotations[index].annotation);
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * wrap_width); 
+    ImGui::TextUnformatted(
+        this->all_annotations[index].annotation.c_str()); // This allows the user to see the whole annotation text
+    ImGui::PopTextWrapPos();
     ImGui::Text("Change Coordinate of Point");
     
     // Button for starting the picking process
