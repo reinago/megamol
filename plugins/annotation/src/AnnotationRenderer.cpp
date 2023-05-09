@@ -56,6 +56,7 @@ AnnotationRenderer::AnnotationRenderer()
         , drawTextSlot("Draw 3D Text", "Enables the drawing of a 3D Text for each Annotation")
         , titleColorSlot("Title Color", "Color for the title of Annotations")
         , textColorSlot("Text Color", "Color for the shown Annotations in the Data")
+        , wrapWidthSlot("Wraping Width for Annotations", "Sets the value for the width of the wraping of the Annotations")
         , saveSlotValuesSlot("saveSlotValues", "Saves the current values of the slots")
         , loadSlotValuesSlot("loadSlotValues", "Loades the saved values of the slots")
         , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
@@ -63,7 +64,6 @@ AnnotationRenderer::AnnotationRenderer()
         , enableAddingAnnotationWindowSlot("Adding Annotations Window", "Enables the Window for adding new Annotations")
         , enableJsonWindowSlot("Json Window", "Enables the Window for handling saved Annotations") //TODO: better description + name
         , enableListWindowSlot("List Window", "Enables the Window that shows the list of all Annotations")
-        , wrappWidthSlot("Wrapping Width for Annotations", "Sets the value for the width of the wrapping of the Annotations")
         , vbo(0)
         , ibo(0)
         , va(0)
@@ -111,6 +111,9 @@ AnnotationRenderer::AnnotationRenderer()
     
     this->textColorSlot.SetParameter(new core::param::ColorParam("#ffffffff"));
     this->MakeSlotAvailable(&this->textColorSlot);
+
+    this->wrapWidthSlot.SetParameter(new core::param::FloatParam(15.0f));
+    this->MakeSlotAvailable(&this->wrapWidthSlot); // TODO: maybe do this wrapWidthSlot with a slider?
     
     this->saveSlotValuesSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
@@ -136,9 +139,6 @@ AnnotationRenderer::AnnotationRenderer()
 
     this->enableListWindowSlot.SetParameter(new core::param::BoolParam(false));
     this->MakeSlotAvailable(&this->enableListWindowSlot);
-
-    this->wrappWidthSlot.SetParameter(new core::param::FloatParam(15.0f));
-    this->MakeSlotAvailable(&this->wrappWidthSlot); // TODO: maybe do this wrapWidthSlot with a slider?
 
     this->json_obj["Points"];
     this->json_obj["Slot Values"];
@@ -770,6 +770,7 @@ void AnnotationRenderer::save_slot_values_to_json() {
     this->json_obj["SlotValues"]["sphereSizeScaling"] = this->sizeScalingSlot.Param<core::param::FloatParam>()->Value();
     this->json_obj["SlotValues"]["textColor"] = this->textColorSlot.Param<core::param::ColorParam>()->Value();
     this->json_obj["SlotValues"]["titleColor"] = this->titleColorSlot.Param<core::param::ColorParam>()->Value();
+    this->json_obj["SlotValues"]["wrapWidth"] = this->wrapWidthSlot.Param<core::param::FloatParam>()->Value();
 }
 
 /* Load the Slot Values from the JSON
@@ -780,6 +781,7 @@ void AnnotationRenderer::load_slot_values_from_json() {
     this->sizeScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["sphereSizeScaling"]);
     this->titleColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["titleColor"]);
     this->textColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["textColor"]);
+    this->wrapWidthSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["wrapWidth"]);
 }
 
 /* Set the Camera to the given Coordinates
@@ -911,11 +913,14 @@ void AnnotationRenderer::display_visual_points_windows(
     window_flags |= ImGuiWindowFlags_NoBackground;
     window_flags |= ImGuiWindowFlags_NoTitleBar;
     window_flags |= ImGuiWindowFlags_NoResize;
+    window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
     bool* p_open = NULL;
     std::string windowNameString = windowName + std::string("##") + std::to_string(curr_index); // Needed to differenciate between this window and the other windows
-    float wrap_width = this->wrappWidthSlot.Param<core::param::FloatParam>()->Value();
+
+    float wrap_width = this->wrapWidthSlot.Param<core::param::FloatParam>()->Value();
+    
     ImGui::SetNextWindowPos(ImVec2(screenPos.x, screenPos.y), 0, ImVec2(0.5f, 0.5f));
-    // ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 15.0f, 200.0f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(ImGui::GetFontSize() * wrap_width, -1.0f));
 
     auto textColorIn = this->textColorSlot.Param<core::param::ColorParam>()->Value();
     ImVec4 textColor = ImVec4(textColorIn[0], textColorIn[1], textColorIn[2], textColorIn[3]);
@@ -924,7 +929,7 @@ void AnnotationRenderer::display_visual_points_windows(
     ImVec4 titleColor = ImVec4(titleColorIn[0], titleColorIn[1], titleColorIn[2], titleColorIn[3]);
     
     ImGui::Begin(windowNameString.c_str(), p_open, window_flags);
-    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 15.0f); // TODO: change 15.0f out with: wrap_width
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * wrap_width); // TODO: change 15.0f out with: wrap_width
     ImGui::TextColored(titleColor, windowName.c_str());
     //ImGui::TextUnformatted(windowName.c_str());
     ImGui::TextColored(textColor, this->all_annotations[curr_index].annotation.c_str());
@@ -1321,15 +1326,12 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
     std::string windowNameString =
         "Editing Annotation: " + this->all_annotations[index].name + std::string("##") +
         std::to_string(index); // Needed to differenciate between this window and the other windows (does not work)
-    float wrap_width = this->wrappWidthSlot.Param<core::param::FloatParam>()->Value();
-
-    // ImGui::SetNextWindowPos(ImVec2(screenPos.x, screenPos.y), 0, ImVec2(0.5f, 0.5f));
 
     ImGui::Begin(windowNameString.c_str(), &this->all_annotations[index].currently_editing , window_flags);
     ImGui::Text("Change Annotation");
     ImGui::InputText("Annotation", &this->all_annotations[index].annotation);
-    //ImGui::Text(this->all_annotations[i].annotation.c_str());
     ImGui::Text("Change Coordinate of Point");
+    
     // Button for starting the picking process
     if (ImGui::Button("Click in the viewport##2")) { // TODO: change description of this Button?
         this->picking_enabled = true;

@@ -295,7 +295,8 @@ private:
     /* Slot for enabling the Window for showing the list with all Annotations */
     core::param::ParamSlot enableListWindowSlot;
 
-    core::param::ParamSlot wrappWidthSlot;
+    /* Slot for changing the Wraping in the Annotations */
+    core::param::ParamSlot wrapWidthSlot;
     
     /*
     VARIABLES
