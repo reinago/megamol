@@ -313,7 +313,6 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
         // TODO: just testing new main function:
         new_main(call);
     }
-    }
 
     //glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -334,16 +333,11 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
  * This function generates the main ImGui window and allows the opening of all other windows.
  */
 void AnnotationRenderer::new_main(CallRender3DGL& call) {
-    bool valid_imgui_scope =
-        ((ImGui::GetCurrentContext() != nullptr) ? (ImGui::GetCurrentContext()->WithinFrameScope) : (false));
-    if (!valid_imgui_scope)
-        return;
-
     // TODO: With this version it is not possible to close the window with the "x" button
     /* Displays the Window for adding new Annotations */
     if (this->enableAddingAnnotationWindowSlot.Param<core::param::BoolParam>()->Value()) {
         this->anotherWindow = true;
-        showAddingAnotationWindow(call, "Adding new Annotations", this->anotherWindow);
+        showAddingAnotationWindow(call, "Adding new Annotations");
     } else {
         this->anotherWindow = false;
     }
@@ -380,24 +374,13 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     if (this->saveSlotValuesSlot.IsDirty()) {
         this->saveSlotValuesSlot.ResetDirty();
         save_slot_values_to_json();
-    }    
-        
-    
-    // TODO: Add saving all points to JSON file in the main list? OR is it better to just have it in the "JSON window"?
-    // // Save the current state of the json_obj to a json file
-    // if (ImGui::Button("Save annotations to Json File")) {
-    //     save_json_to_file();
-    // }
-    // TODO: DEBUG ONLY
-    showSphereAtPoint(call, glm::vec3(0.0f, 0.0f, 0.0f));
-    drawConnectionLine(call, glm::vec2(1000.0f, 100.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-    
+    }
 }
 
 /*
 * Function for the ImGui window that allows the adding of a new point.
 */
-void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::string window_name, bool &window_open) {
+void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::string window_name) {
     // Is this needed here as well?
     bool valid_imgui_scope =
         ((ImGui::GetCurrentContext() != nullptr) ? (ImGui::GetCurrentContext()->WithinFrameScope) : (false));
@@ -922,16 +905,16 @@ void AnnotationRenderer::display_visual_points_windows(
     ImGui::SetNextWindowPos(ImVec2(screenPos.x, screenPos.y), 0, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(ImGui::GetFontSize() * wrap_width, -1.0f));
 
-    auto textColorIn = this->textColorSlot.Param<core::param::ColorParam>()->Value();
+    megamol::core::param::ColorParam::ColorType textColorIn = this->textColorSlot.Param<core::param::ColorParam>()->Value();
     ImVec4 textColor = ImVec4(textColorIn[0], textColorIn[1], textColorIn[2], textColorIn[3]);
 
-    auto titleColorIn = this->titleColorSlot.Param<core::param::ColorParam>()->Value();
+    megamol::core::param::ColorParam::ColorType titleColorIn =
+        this->titleColorSlot.Param<core::param::ColorParam>()->Value();
     ImVec4 titleColor = ImVec4(titleColorIn[0], titleColorIn[1], titleColorIn[2], titleColorIn[3]);
     
     ImGui::Begin(windowNameString.c_str(), p_open, window_flags);
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * wrap_width); // TODO: change 15.0f out with: wrap_width
     ImGui::TextColored(titleColor, windowName.c_str());
-    //ImGui::TextUnformatted(windowName.c_str());
     ImGui::TextColored(textColor, this->all_annotations[curr_index].annotation.c_str());
     ImGui::PopTextWrapPos();
 
@@ -1108,7 +1091,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
 
             float xs5[100];
             for (int k = 0; k < amountLines; k++) {
-                
                 if (startTime <= endTime) {
                     if (k >= startLine && k <= endLine) {
                         xs5[k] = 1.0f;

@@ -208,7 +208,7 @@ private:
 
     void showSphereAtPoint(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords);
 
-    void showAddingAnotationWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name, bool& window_open);
+    void showAddingAnotationWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name);
 
     void save_new_point_to_json(megamol::mmstd_gl::CallRender3DGL& call, annotation_struct input);
 
@@ -224,7 +224,6 @@ private:
 
     void save_json_to_file();
 
-    void drawPointNames(megamol::mmstd_gl::CallRender3DGL& call);
     void save_slot_values_to_json();
 
     void load_slot_values_from_json();
@@ -331,13 +330,6 @@ private:
     bool show_json_window;
 
     /* ImGui Second Window Variables */
-    //float annot_win_coordinates_input[3];
-    //std::string annot_win_annotation_input;
-    //float annot_win_color_input[3];
-    //glm::vec3 annot_win_color;
-    //bool show_annot_win_point;
-    //std::string annot_win_point_name_input;
-    //annotation_struct annot_win_struct;
     annot_window_struct annot_win_struct;
 
     std::vector<glm::vec2> pointWindowSizes;
