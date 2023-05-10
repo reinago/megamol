@@ -653,10 +653,9 @@ glm::vec3 AnnotationRenderer::calcClickedPoint(int x, int y, CallRender3DGL& cal
     // flip the y coordinates with getHeight from the Framebuffer
     y = lhsFBO->getHeight() - y;
     int dataSize = 1 * 1;
-    float* data = new float[dataSize];
-    glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, data); // change 1,1 if bigger area is needed
+    std::vector<float> data(dataSize);
+    glReadPixels(x, y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, data.data()); // change 1,1 if bigger area is needed
     float depth = data[0];
-    delete[] data;
 
     float nDepth = 2 * depth - 1;
     
