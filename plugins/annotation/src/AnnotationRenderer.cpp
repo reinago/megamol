@@ -76,7 +76,7 @@ AnnotationRenderer::AnnotationRenderer()
         , lastX()
         , lastY()
         , my_color()
-        , allowDeletion(false)
+        , listWindowBooleans({false, false})
         , pointWindowSizes()
         , first_win_coordinates_input()
         , first_win_color_input()
@@ -906,7 +906,12 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
     const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
     const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
     bool* p_open = NULL;
-    ImGui::Begin("Annotation List", p_open);
+
+    ImGuiWindowFlags window_flags = 0;
+    if (listWindowBooleans.autoResize)
+        window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+    
+    ImGui::Begin("Annotation List", p_open, window_flags);
     // list all annotation names
     //ImGui::BeginTabBar("#Lists");
     //for (int i = 0; i < this->all_annotations.size(); i++) {
@@ -919,10 +924,13 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
                                    ImGuiTableFlags_NoBordersInBody;
     static ImGuiTableFlags flags_Slider = 0;
 
-
+    ImGui::Text("Change Flags for this window:");
+    ImGui::Checkbox("Allow Automatic Resizing of this window", &this->listWindowBooleans.autoResize);
+    // TODO: More Flags?
+    
     if (ImGui::BeginTable("3ways", 5, flags)) {
         // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide);
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
         ImGui::TableSetupColumn("Visibility", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 12.0f);
         ImGui::TableSetupColumn("Timeline", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
         ImGui::TableSetupColumn("Start Time", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
@@ -985,7 +993,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
             ImGui::EndTooltip();
         }
         ImGui::TableNextColumn();
-        ImGui::Checkbox("Enable Deleting", &this->allowDeletion);
+        ImGui::Checkbox("Enable Deleting", &this->listWindowBooleans.allowDeletion);
         if (ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
             ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
@@ -1053,7 +1061,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
             ImGui::TableNextColumn();
             std::string message = "Delete this Annotation##" + std::to_string(i);
             if (ImGui::Button(message.c_str())) {
-                if (allowDeletion) {
+                if (this->listWindowBooleans.allowDeletion) {
                     deleteThis = true;
                 }
             }

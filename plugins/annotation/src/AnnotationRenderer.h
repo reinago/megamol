@@ -89,6 +89,12 @@ struct occlusionQueries {
     std::vector<bool> queryStarted;
 };
 
+struct listWindowStruct {
+    // This is for enabeling and disabeling Deletion of annotations.
+    bool allowDeletion;
+    bool autoResize;
+};
+
 
 namespace megamol::annotation {
 
@@ -338,8 +344,8 @@ private:
 
     std::vector<annotation_struct> all_annotations;
 
-    // This is for enabeling and disabeling Deletion of annotations.
-    bool allowDeletion;
+    /** ImGui List Variables */
+    listWindowStruct listWindowBooleans;
 
     /* json Variables */
 
