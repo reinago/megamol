@@ -22,6 +22,7 @@
 #include "mmstd_gl/ModuleGL.h"
 #include "mmstd_gl/renderer/CallRender3DGL.h"
 #include "mmstd_gl/renderer/Renderer3DModuleGL.h"
+#include "mmcore_gl/utility/SDFFont.h"
 #include "ScriptPaths.h"
 
 #include "FrontendResource.h"
@@ -235,8 +236,6 @@ private:
     void display_visual_points_windows(megamol::mmstd_gl::CallRender3DGL& call, std::string windowName, int curr_index,
         glm::vec3 point_pos, glm::vec2 offset = glm::vec2(0.0f, 0.0f), bool drawLine = true, bool saveSize = false);
 
-
-
     void showSphereAtPointIndex(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords, int index);
 
     void list_Window(megamol::mmstd_gl::CallRender3DGL& call);
@@ -255,6 +254,8 @@ private:
     void updateAnnotationInJsonObj(megamol::mmstd_gl::CallRender3DGL& call, int i);
 
     void saveNewPoint(megamol::mmstd_gl::CallRender3DGL& call, annotation_struct input);
+
+    void deleteAnnotation(megamol::mmstd_gl::CallRender3DGL& call, int i);
     
     /* Parameters */
     /** Slot for the scaling factor of the pointsize*/
@@ -337,6 +338,8 @@ private:
 
     std::vector<annotation_struct> all_annotations;
 
+    // This is for enabeling and disabeling Deletion of annotations.
+    bool allowDeletion;
 
     /* json Variables */
 

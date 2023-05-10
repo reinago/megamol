@@ -76,6 +76,7 @@ AnnotationRenderer::AnnotationRenderer()
         , lastX()
         , lastY()
         , my_color()
+        , allowDeletion(false)
         , pointWindowSizes()
         , first_win_coordinates_input()
         , first_win_color_input()
@@ -919,12 +920,13 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
     static ImGuiTableFlags flags_Slider = 0;
 
 
-    if (ImGui::BeginTable("3ways", 4, flags)) {
+    if (ImGui::BeginTable("3ways", 5, flags)) {
         // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoHide);
         ImGui::TableSetupColumn("Visibility", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 12.0f);
         ImGui::TableSetupColumn("Timeline", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
         ImGui::TableSetupColumn("Start Time", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
+        ImGui::TableSetupColumn("Deleting Point", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
         ImGui::TableHeadersRow();
 
         // TODO: Allow sorting of entries!
@@ -973,6 +975,25 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
 
         ImGui::PlotLines("", arr, IM_ARRAYSIZE(arr));
         
+        ImGui::TableNextColumn();
+        ImGui::SmallButton("Start Time");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            ImGui::TextUnformatted("This shows the Frametime when the Annotation starts being visible.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+        ImGui::TableNextColumn();
+        ImGui::Checkbox("Enable Deleting", &this->allowDeletion);
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            ImGui::TextUnformatted("If enabled, then all below Buttons will delete the corresponding Annotation without further promts.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+        
         // loop over all annotations in all_annotations
         // entries will be: name, timeline
         // collapsed for each entry: annotation text, change annotation, jump to annotation
@@ -998,9 +1019,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
             ImGui::TextColored(color1, text1.c_str());
             
             ImGui::TableNextColumn();
-            // ImGui::TextDisabled("--");
-            // std::string tempText = createTimelineArt(call, this->all_annotations[i].start_ts, this->all_annotations[i].end_ts);
-            // ImGui::Text(tempText.c_str());
 
             float startTime = this->all_annotations[i].start_ts;
             float endTime = this->all_annotations[i].end_ts;
@@ -1028,8 +1046,18 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
             
             ImGui::TableNextColumn();
             // show start time, for sorting
-            // TODO: allow sorting in the table
             ImGui::Text(std::to_string(this->all_annotations[i].start_ts).c_str());
+
+            // Allows deleting the current Annotation. The function for this is called at the end of this loop.
+            bool deleteThis = false;
+            ImGui::TableNextColumn();
+            std::string message = "Delete this Annotation##" + std::to_string(i);
+            if (ImGui::Button(message.c_str())) {
+                if (allowDeletion) {
+                    deleteThis = true;
+                }
+            }
+
             if (open) {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
@@ -1102,6 +1130,10 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
                     
 
                 ImGui::TreePop();
+            }
+            if (deleteThis) {
+                deleteAnnotation(call, i);
+                i--;
             }
         }
         ImGui::EndTable();
@@ -1343,4 +1375,10 @@ void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct in
     // glDeleteQueries(occlusionQuery.size(), occlusionQuery.data());
     glGenQueries(occlusionQuery.query.size(),
         occlusionQuery.query.data() + occlusionQuery.query.size() - 2); // TODO: does this still work?
+}
+
+void AnnotationRenderer::deleteAnnotation(CallRender3DGL& call, int i) {
+    this->all_annotations.erase(this->all_annotations.begin() + i);
+    this->json_obj["Points"].erase(this->json_obj["Points"].begin() + i);
+    std::cout << std::setw(4) << json_obj << std::endl;
 }
