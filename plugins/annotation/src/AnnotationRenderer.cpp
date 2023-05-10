@@ -1305,8 +1305,12 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
         this->all_annotations[index].cam_orientation = call.GetCamera().getPose().to_quat();
     }
 
-    if (ImGui::Button("Update the json_obj with current values")) { // TODO: this is USELESS!!!! because any changes are already being done the moment they happen.
-        updateAnnotationInJsonObj(call, index); // TODO: add struct as import => can change as wanted
+    if (ImGui::Button("Restore Values from json_obj")) {
+        loadOldValuesFromJsonobj(call, index);
+    }
+    
+    if (ImGui::Button("Update the json_obj with current values")) {
+        updateAnnotationInJsonObj(call, index);
     }
     ImVec2 currWinPos = ImGui::GetWindowPos();
     drawConnectionLine(call, glm::vec2(currWinPos.x, currWinPos.y), this->all_annotations[index].coordinates);
@@ -1388,5 +1392,22 @@ void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct in
 void AnnotationRenderer::deleteAnnotation(CallRender3DGL& call, int i) {
     this->all_annotations.erase(this->all_annotations.begin() + i);
     this->json_obj["Points"].erase(this->json_obj["Points"].begin() + i);
-    std::cout << std::setw(4) << json_obj << std::endl;
+    std::cout << std::setw(4) << json_obj << std::endl; // TODO: remove this line...?
+}
+
+/* Load the values of the given Annotation from the json_obj and save them in all_annotations[i] */
+void AnnotationRenderer::loadOldValuesFromJsonobj(CallRender3DGL& call, int i) {
+    auto tempObject = this->json_obj["Points"][i];
+
+    auto temp = tempObject["Coordinates"];
+    auto tempCamPos = tempObject["Camera Position"];
+    auto tempCamOrient = tempObject["Camera Orientation"];
+    
+    this->all_annotations[i].annotation = tempObject["Annotation"];
+    this->all_annotations[i].coordinates = glm::vec3(temp[0], temp[1], temp[2]);
+    this->all_annotations[i].start_ts = tempObject["Start Timestamp"];
+    this->all_annotations[i].start_ts = tempObject["End Timestamp"];
+    this->all_annotations[i].cam_pos = glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]);
+    this->all_annotations[i].cam_orientation = glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1],
+        tempCamOrient[2]); // 3,0,1,2 because quat in megamol is x,y,z,w and glm::quat is w,x,y,z
 }

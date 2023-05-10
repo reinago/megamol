@@ -262,6 +262,8 @@ private:
     void saveNewPoint(megamol::mmstd_gl::CallRender3DGL& call, annotation_struct input);
 
     void deleteAnnotation(megamol::mmstd_gl::CallRender3DGL& call, int i);
+
+    void loadOldValuesFromJsonobj(megamol::mmstd_gl::CallRender3DGL& call, int i);
     
     /* Parameters */
     /** Slot for the scaling factor of the pointsize*/
