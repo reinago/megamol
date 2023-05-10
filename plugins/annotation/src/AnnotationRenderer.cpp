@@ -141,7 +141,7 @@ AnnotationRenderer::AnnotationRenderer()
     this->MakeSlotAvailable(&this->enableListWindowSlot);
 
     this->json_obj["Points"];
-    this->json_obj["Slot Values"];
+    this->json_obj["SlotValues"];
 
     // load the json file:
     // TODO: loading jason from file here throws an error
@@ -354,15 +354,17 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
         list_Window(call);
     }
     
-
-    // TODO: add some kind of Prompt for 
     if (this->loadJsonFromFileSlot.IsDirty()) {
         this->loadJsonFromFileSlot.ResetDirty();
-        load_json_from_file(call); // keep in mind this WILL just overvrite the current state without any promt right now!!!
+        loadJsonFromFileToVectors(call);
     }
 
     if (this->saveJsonToFileSlot.IsDirty()) {
         this->saveJsonToFileSlot.ResetDirty();
+        // Update the JsonObject with the current state of the all_annotations vector
+        for (int i = 0; i < this->all_annotations.size(); i++) {
+            updateAnnotationInJsonObj(call, i);
+        }
         save_json_to_file();
     }
 
@@ -374,7 +376,7 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     if (this->saveSlotValuesSlot.IsDirty()) {
         this->saveSlotValuesSlot.ResetDirty();
         save_slot_values_to_json();
-    }
+    } 
 }
 
 /*
@@ -450,7 +452,8 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     }
     if (ImGui::Button("Save current coords and Annotation")) {
         // TODO: CLEAR all inputs of the imgui variables in this window after saving the new point (to prevent dupplications etc)?
-        save_new_point_to_json(call, this->annot_win_struct.annot_struct);
+        // save_new_point_to_json(call, this->annot_win_struct.annot_struct);
+        saveNewPoint(call, this->annot_win_struct.annot_struct);
     }
 
     if (this->annot_win_struct.show_point) {
@@ -518,55 +521,6 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     glDisable(GL_DEPTH_TEST);
 }
 
-/* Function to write the current coordinates and annotation to a json file */
-void AnnotationRenderer::save_new_point_to_json(CallRender3DGL& call, annotation_struct input) {
-    // TODO: add saving of color?
-
-    // update the amount of points with annotations
-    ++json_amount;
-
-    // save the current point and annotation
-    json_obj["Points"][json_amount - 1] = {
-        {"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
-        {"Annotation", input.annotation},
-        {"Point Number", json_amount}, // to be able to get the correct number of the point again later TODO: is this really needed?
-        {"Point Name", input.name},
-        {"Show Window", false},
-        {"Show Point", false},
-        {"Point Time Visible", false},
-        {"Start Timestamp", input.start_ts},
-        {"End Timestamp", input.end_ts},
-        {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
-        {"Camera Orientation", {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}
-    };
-
-    // Add entries to occlusionQuery and oqResults vectors:
-    occlusionQuery.query.resize(occlusionQuery.query.size() + 2);
-    occlusionQuery.result.resize(occlusionQuery.result.size() + 2);
-    // glDeleteQueries(occlusionQuery.size(), occlusionQuery.data());
-    glGenQueries(occlusionQuery.query.size(), occlusionQuery.query.data() + occlusionQuery.query.size() - 2);
-
-    // TODO: maybe save the json every time this function is called
-    // TODO: In case of saving every time a new entry was made, maybe add a _temp file that is deleted after the user saves to the real file
-    // write json to vectors every time a new entry was made?
-    // TODO: Calling write to vector CLOSES ALL opened windows!!!!!!
-    // TODO: something went wrong with Time stamps when saving two similar points close after one another...
-    write_json_obj_data_to_vectors(call, false);
-    std::cout << json_obj.dump(4) << std::endl;
-}
-
-/* Function to update the values of the given point in the json_obj and the corresponding vectors.
-Only updates Annotation and Coordinates. */
-void AnnotationRenderer::update_point_in_json(
-    CallRender3DGL& call, glm::vec3 coords, std::string annotation, int point_index) {
-    // update the json object
-    this->json_obj["Points"][point_index]["Coordinates"] = {coords.x, coords.y, coords.z}; // update the Coordinates
-    this->json_obj["Points"][point_index]["Annotation"] = annotation;                      // update the annotation
-    display_visual_points_windows(call, this->all_annotations[point_index].name, point_index,
-        this->all_annotations[point_index].coordinates, glm::vec2(0.0f, 0.0f), false, true);
-    std::cout << json_obj.dump(4) << std::endl;
-}
-
 /* Writes the Names of the currently stored Points in the json_obj to a vector
 Add a bool of true, if this function is called after loading a file, this will reset all stored window-bools */
 void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bool loaded_from_file) {
@@ -589,7 +543,7 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
         if (i >= all_annotations.size()) {
             this->all_annotations.push_back(
                 {x.value()["Annotation"], glm::vec3(temp[0], temp[1], temp[2]), x.value()["Point Name"],
-                    x.value()["Show Window"], x.value()["Show Point"], x.value()["Point Time Visible"], x.value()["Start Timestamp"],
+                    false, false, false, x.value()["Start Timestamp"],
                     x.value()["End Timestamp"], glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]),
                     glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]), false});
             // For saving the window Sizes
@@ -598,9 +552,9 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
             this->all_annotations[i].annotation = x.value()["Annotation"];
             this->all_annotations[i].coordinates = glm::vec3(temp[0], temp[1], temp[2]);
             this->all_annotations[i].name = x.value()["Point Name"];
-            this->all_annotations[i].show_window = x.value()["Show Window"];
-            this->all_annotations[i].show_point = x.value()["Show Point"];
-            this->all_annotations[i].aviable_at_current_time = x.value()["Point Time Visible"];
+            this->all_annotations[i].show_window = false;
+            this->all_annotations[i].show_point = false;
+            this->all_annotations[i].aviable_at_current_time = false;
             this->all_annotations[i].start_ts = x.value()["Start Timestamp"];
             this->all_annotations[i].start_ts = x.value()["End Timestamp"];
             this->all_annotations[i].cam_pos = glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]);
@@ -651,7 +605,7 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
     showSphereAtPoint(call, this->all_annotations[curr_index].coordinates);
     // ImGui::Button
     if (ImGui::Button("Update the json_obj with current values"))
-        update_point_in_json(call, this->all_annotations[curr_index].coordinates, this->all_annotations[curr_index].annotation, curr_index);
+        updateAnnotationInJsonObj(call, curr_index);
 
     // load camera Position:
     if (ImGui::Button("Load camera position"))
@@ -659,41 +613,6 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
             call, this->all_annotations[curr_index].cam_pos, this->all_annotations[curr_index].cam_orientation);
     
     ImGui::End();
-}
-
-
-/* Loads the json file that is found under its path into the json_obj and the vector all_annotatins */
-void AnnotationRenderer::load_json_from_file(CallRender3DGL& call) {
-    // TODO: change the path to the path of the json file
-    // std::ifstream i("C:\\Dateien\\megamol\\pretty.json");
-    std::string file_path = determineJsonFilePath();
-    if (file_path.empty()) {
-        // TODO: Add warning message that there is no file to be loaded!
-        // this is just a warning message on the console that is not nessecerily something for the "regular" user
-        std::cout << "There is no file to be loaded" << std::endl;
-        return;
-    }
-    std::ifstream i(file_path);
-    i >> json_obj;
-    // TODO: this line is ONLY for debugging...
-    if (IsDebuggerPresent)
-        std::cout << std::setw(4) << json_obj << std::endl;
-    // temp is for counting the amount of points in the json file
-    int temp = 0;
-    for (auto& x : json_obj["Points"].items()) {
-        ++temp;
-    }
-    json_amount = temp;
-    // now write the names to the and bools to the vector
-    write_json_obj_data_to_vectors(call, true);
-}
-
-/*
-* Saves the current state of the variable "json_obj" into the json file for the currently used project.
-*/
-void AnnotationRenderer::save_json_to_file() {
-    std::ofstream o(determineJsonFilePath());
-    o << std::setw(4) << this->json_obj << std::endl;
 }
 
 // TODO: does this cause problems if the current project is NOT loaded BUT thrown together in the editor?
@@ -1169,8 +1088,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
                 //    }
                 //    
                 //    if (ImGui::Button("Update the json_obj with current values")) {
-                //        update_point_in_json(this->all_annotations[i].coordinates,
-                //            this->all_annotations[i].annotation, i); // TODO: add struct as import => can change as wanted
+                //        updateAnnotationInJsonObj(call, i); // TODO: add struct as import => can change as wanted
                 //    }
                 //    ImGui::TreePop();
                 //}
@@ -1348,8 +1266,7 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
     }
 
     if (ImGui::Button("Update the json_obj with current values")) { // TODO: this is USELESS!!!! because any changes are already being done the moment they happen.
-        update_point_in_json(call, this->all_annotations[index].coordinates, this->all_annotations[index].annotation,
-            index); // TODO: add struct as import => can change as wanted
+        updateAnnotationInJsonObj(call, index); // TODO: add struct as import => can change as wanted
     }
     ImVec2 currWinPos = ImGui::GetWindowPos();
     drawConnectionLine(call, glm::vec2(currWinPos.x, currWinPos.y), this->all_annotations[index].coordinates);
@@ -1357,3 +1274,73 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
 }
 
 
+/* Load the Json file and then call another function to save the data to all_annotations vector.
+This function preserves all previously aviable data. */
+void AnnotationRenderer::loadJsonFromFileToVectors(CallRender3DGL& call) {
+    // TODO: change the path to the path of the json file
+    std::string file_path = determineJsonFilePath();
+    if (file_path.empty()) {
+        // this is just a warning message on the console that is not nessecerily something for the "regular" user
+        std::cout << "There is no file to be loaded" << std::endl;
+        return;
+    }
+    std::ifstream i(file_path);
+    nlohmann::json tempJson;
+    i >> tempJson;
+    // TODO: this line is ONLY for debugging...
+    if (IsDebuggerPresent)
+        std::cout << std::setw(4) << tempJson << std::endl;
+
+    for (auto& element : tempJson["Points"].items()) {
+        this->json_obj["Points"].push_back(element.value());
+    }
+    this->json_obj["SlotValues"].clear();
+    for (auto& element : tempJson["SlotValues"].items()) {
+        this->json_obj["SlotValues"][element.key()] = element.value();
+    }
+
+    // now write the names to the and bools to the vector
+    write_json_obj_data_to_vectors(call, true);
+}
+
+/* Updates the json_obj for the annotation at index i, with the current values of this annotation in the vector all_annotations. */
+void AnnotationRenderer::updateAnnotationInJsonObj(CallRender3DGL& call, int i) {
+    // Needs at least one Annotation to be able to save
+    annotation_struct input = this->all_annotations[i];
+    json_obj["Points"][i] = {{"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
+        {"Annotation", input.annotation}, {"Point Name", input.name}, {"Start Timestamp", input.start_ts},
+        {"End Timestamp", input.end_ts}, {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
+        {"Camera Orientation",
+            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}};
+}
+
+/* Saves the current state of the variable "json_obj" into the json file for the currently used project.
+ */
+void AnnotationRenderer::save_json_to_file() {
+    std::ofstream o(determineJsonFilePath());
+    o << std::setw(4) << this->json_obj << std::endl;
+}
+
+/* Saves the given struct to the Vector all_annotations
+This function is only to be called after this new */
+void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct input) {
+
+    this->all_annotations.push_back(input);
+    this->pointWindowSizes.push_back(glm::vec2(0.0f, 0.0f));
+
+    json_obj["Points"][this->all_annotations.size() - 1] = {
+        {"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
+        {"Annotation", input.annotation}, {"Point Name", input.name}, {"Start Timestamp", input.start_ts},
+        {"End Timestamp", input.end_ts}, {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
+        {"Camera Orientation",
+            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}};
+
+    // Add entries to occlusionQuery and oqResults vectors:
+    occlusionQuery.query.resize(occlusionQuery.query.size() + 2);
+    occlusionQuery.result.resize(occlusionQuery.result.size() + 2);
+    occlusionQuery.resultAv.resize(occlusionQuery.resultAv.size() + 2);
+    occlusionQuery.queryStarted.resize(occlusionQuery.queryStarted.size() + 2);
+    // glDeleteQueries(occlusionQuery.size(), occlusionQuery.data());
+    glGenQueries(occlusionQuery.query.size(),
+        occlusionQuery.query.data() + occlusionQuery.query.size() - 2); // TODO: does this still work?
+}
