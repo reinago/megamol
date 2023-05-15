@@ -91,8 +91,9 @@ struct occlusionQueries {
 
 struct listWindowStruct {
     // This is for enabeling and disabeling Deletion of annotations.
-    bool allowDeletion;
-    bool autoResize;
+    bool allowDeletion = false;
+    bool autoResize = true;
+    bool opaqueWindowsOfPoints = true;
 };
 
 
@@ -304,6 +305,8 @@ private:
 
     /* Slot for changing the Wraping in the Annotations */
     core::param::ParamSlot wrapWidthSlot;
+
+    core::param::ParamSlot filename_slot;
     
     /*
     VARIABLES
@@ -354,6 +357,7 @@ private:
     nlohmann::json json_obj;
     int json_amount;
     std::string json_file_path;
+    bool json_file_path_set;
 
     int json_point_name_selectedIndex;
 

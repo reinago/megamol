@@ -25,6 +25,7 @@
 #include "mmcore/param/EnumParam.h"
 #include "mmcore/param/IntParam.h"
 #include "mmcore/param/ButtonParam.h"
+#include "mmcore/param/FilePathParam.h"
 #include "mmcore/utility/log/Log.h"
 #include "mmcore_gl/utility/ShaderFactory.h"
 
@@ -57,6 +58,7 @@ AnnotationRenderer::AnnotationRenderer()
         , titleColorSlot("Title Color", "Color for the title of Annotations")
         , textColorSlot("Text Color", "Color for the shown Annotations in the Data")
         , wrapWidthSlot("Wraping Width for Annotations", "Sets the value for the width of the wraping of the Annotations")
+        , filename_slot("JSON File", "The path to the JSON file to use")
         , saveSlotValuesSlot("saveSlotValues", "Saves the current values of the slots")
         , loadSlotValuesSlot("loadSlotValues", "Loades the saved values of the slots")
         , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
@@ -85,7 +87,8 @@ AnnotationRenderer::AnnotationRenderer()
         , anotherWindow(false)
         , annot_win_struct()
         , show_json_window(false)
-        , json_file_path()
+        , json_file_path("")
+        , json_file_path_set(false)
         , json_point_name_selectedIndex(0)
         , grh(false)
         , all_annotations()
@@ -116,6 +119,9 @@ AnnotationRenderer::AnnotationRenderer()
     this->wrapWidthSlot.SetParameter(new core::param::FloatParam(15.0f));
     this->MakeSlotAvailable(&this->wrapWidthSlot); // TODO: maybe do this wrapWidthSlot with a slider?
     
+    this->filename_slot << new core::param::FilePathParam("");
+    this->MakeSlotAvailable(&this->filename_slot);
+
     this->saveSlotValuesSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
     this->MakeSlotAvailable(&this->saveSlotValuesSlot);
@@ -377,7 +383,17 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     if (this->saveSlotValuesSlot.IsDirty()) {
         this->saveSlotValuesSlot.ResetDirty();
         save_slot_values_to_json();
-    } 
+    }
+
+    // sets the filePath
+    if (this->filename_slot.IsDirty()) {
+        this->filename_slot.ResetDirty();
+
+        // Read data
+        const auto& filepath = this->filename_slot.Param<core::param::FilePathParam>()->Value();
+        json_file_path = filepath.generic_u8string();
+        json_file_path_set = true; // TODO: check for valid path?
+    }
 }
 
 /*
@@ -623,7 +639,7 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
  * Returns the file Path to the json file.
  * This file will be in the same folder as the given project file.
  */
-std::string AnnotationRenderer::determineJsonFilePath(void) const {
+std::string AnnotationRenderer::determineJsonFilePath() const {
     std::string path;
 
     const auto& paths = frontend_resources.get<megamol::frontend_resources::ScriptPaths>().lua_script_paths;
@@ -1321,11 +1337,16 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
 This function preserves all previously aviable data. */
 void AnnotationRenderer::loadJsonFromFileToVectors(CallRender3DGL& call) {
     // TODO: change the path to the path of the json file
-    std::string file_path = determineJsonFilePath();
-    if (file_path.empty()) {
-        // this is just a warning message on the console that is not nessecerily something for the "regular" user
-        std::cout << "There is no file to be loaded" << std::endl;
-        return;
+    std::string file_path = "";
+    if (json_file_path_set) {
+        file_path = this->json_file_path;
+    } else {
+        file_path = determineJsonFilePath();
+        if (file_path.empty()) {
+            // this is just a warning message on the console that is not nessecerily something for the "regular" user
+            std::cout << "There is no file to be loaded" << std::endl;
+            return;
+        }
     }
     std::ifstream i(file_path);
     nlohmann::json tempJson;
