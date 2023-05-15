@@ -845,7 +845,10 @@ void AnnotationRenderer::display_visual_points_windows(
     screenPos = screenPos + glm::vec2(offset.x, offset.y); // add offset to the screen position to prevent overlapping windows
 
     ImGuiWindowFlags window_flags = 0;
-    window_flags |= ImGuiWindowFlags_NoBackground;
+    if (this->listWindowBooleans.opaqueWindowsOfPoints) {
+        window_flags |= ImGuiWindowFlags_NoBackground;
+    }
+    // window_flags |= ImGuiWindowFlags_NoBackground;
     window_flags |= ImGuiWindowFlags_NoTitleBar;
     window_flags |= ImGuiWindowFlags_NoResize;
     window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
@@ -958,6 +961,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
 
     ImGui::Text("Change Flags for this window:");
     ImGui::Checkbox("Allow Automatic Resizing of this window", &this->listWindowBooleans.autoResize);
+    ImGui::Checkbox("Turn Points Window opaque", &this->listWindowBooleans.opaqueWindowsOfPoints);
     // TODO: More Flags?
     
     if (ImGui::BeginTable("3ways", 5, flags)) {
