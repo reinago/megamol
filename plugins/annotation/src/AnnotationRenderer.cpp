@@ -406,18 +406,24 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     if (!valid_imgui_scope)
         return;
 
+    ImGuiWindowFlags window_flags = 0;
+    window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+
     std::string windowNameString = window_name + std::string("##") + window_name;
     bool* p_open = NULL; // for removing the x on the top right corner of the window
-    ImGui::Begin(windowNameString.c_str(), p_open);
+    ImGui::Begin(windowNameString.c_str(), p_open, window_flags);
     ImGui::InputText("Point Name", &this->annot_win_struct.point_name_input);
     ImGui::Text("Write your annotations here:");
     ImGui::InputText("Annotation", &this->annot_win_struct.annotation_input);
-    ImGui::Text(this->annot_win_struct.annotation_input.c_str()); // TODO: Allow \n or similar functions to work!
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 20.0f);
+    ImGui::TextUnformatted(this->annot_win_struct.annotation_input.c_str());
+    ImGui::PopTextWrapPos();
+    // ImGui::Text(this->annot_win_struct.annotation_input.c_str()); // TODO: Allow \n or similar functions to work!
     ImGui::InputFloat3("input coordinates", this->annot_win_struct.coordinates_input);
 
     // save inputs in global struct variable annot_win_struct
     this->annot_win_struct.annot_struct.coordinates = glm::vec3(this->annot_win_struct.coordinates_input[0],
-        this->annot_win_struct.coordinates_input[1], this->annot_win_struct.coordinates_input[2]);
+         this->annot_win_struct.coordinates_input[1], this->annot_win_struct.coordinates_input[2]);
     this->annot_win_struct.annot_struct.name = this->annot_win_struct.point_name_input;
     this->annot_win_struct.annot_struct.annotation = this->annot_win_struct.annotation_input;
 
@@ -430,7 +436,12 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     if (ImGui::Button("Save current camera position")) {
         this->annot_win_struct.annot_struct.cam_pos = call.GetCamera().getPose().position;
         this->annot_win_struct.annot_struct.cam_orientation = call.GetCamera().getPose().to_quat();
+        this->annot_win_struct.camera_set = true;
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled();
+    ImGui::Checkbox("##", &this->annot_win_struct.camera_set);
+    ImGui::EndDisabled();
 
     if (this->picking_enabled) {
         ImGui::Text("Click in the viewport to add a new point");
@@ -451,30 +462,36 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         }
     }
 
-    
-    if (ImGui::Button("Toggle Sphere")) {
-        if (this->annot_win_struct.show_point) {
-            this->annot_win_struct.show_point = false;
-        } else {
-            this->annot_win_struct.show_point = true;
-        }
+    if (ImGui::Checkbox("Show Sphere", &this->annot_win_struct.show_point)) {
+        showSphereAtPoint(call, this->annot_win_struct.annot_struct.coordinates); //TODO: only shows for a short periode of time and then never again...
     }
 
     ImGui::Text("Save your Timestamps here:");
     if (ImGui::Button("Start")) {
         this->annot_win_struct.annot_struct.start_ts = call.Time();
+        this->annot_win_struct.start_ts_set = true;
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled();
+    ImGui::Checkbox("##", &this->annot_win_struct.start_ts_set);
+    ImGui::EndDisabled();
+    
     if (ImGui::Button("End")) {
         this->annot_win_struct.annot_struct.end_ts = call.Time();
+        this->annot_win_struct.end_ts_set = true;
+        
     }
+    ImGui::SameLine();
+    ImGui::BeginDisabled();
+    ImGui::Checkbox("##", &this->annot_win_struct.end_ts_set);
+    ImGui::EndDisabled();
+    
     if (ImGui::Button("Save current coords and Annotation")) {
         // TODO: CLEAR all inputs of the imgui variables in this window after saving the new point (to prevent dupplications etc)?
         // save_new_point_to_json(call, this->annot_win_struct.annot_struct);
         saveNewPoint(call, this->annot_win_struct.annot_struct);
-    }
-
-    if (this->annot_win_struct.show_point) {
-        showSphereAtPoint(call, this->annot_win_struct.annot_struct.coordinates);
+        // reset the inputs
+        this->annot_win_struct = {}; 
     }
     ImGui::End();
 }

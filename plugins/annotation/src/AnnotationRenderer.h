@@ -76,6 +76,10 @@ struct annot_window_struct {
     bool show_point;
     // annotation_struct for storing all inputs into the json_obj when pressing "save"
     annotation_struct annot_struct;
+
+    bool start_ts_set = false;
+    bool end_ts_set = false;
+    bool camera_set = false;
 };
 
 struct occlusionQueries {
