@@ -37,45 +37,45 @@
 // struct annotation_struct with glm::vec3 coordinates, std::string annotation, std::string name, bool show_window
 struct annotation_struct {
     // Annotation of the current point
-    std::string annotation;
+    std::string annotation = "";
     // Coordinates of the current point
-    glm::vec3 coordinates;
+    glm::vec3 coordinates = glm::vec3(0.0f,0.0f,0.0f);
     // Name of the current point
-    std::string name;
+    std::string name = "";
     // Bool for showing the current point in a window
-    bool show_window;
+    bool show_window = false;
     // Bool for showing the current point in the 3D view
-    bool show_point;
+    bool show_point = false;
     // Bool for showing if the current point might be visible at the current time
-    bool aviable_at_current_time;
+    bool aviable_at_current_time = false;
     // Start Timestamp of the annotation
-    float start_ts;
+    float start_ts = 0.0f;
     // End Timestamp of the annotation
-    float end_ts;
+    float end_ts = 0.0f;
     // Current camera position
-    glm::vec3 cam_pos;
+    glm::vec3 cam_pos = glm::vec3(0.0f,0.0f,0.0f);
     // Current camera orientation
-    glm::quat cam_orientation;
+    glm::quat cam_orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    bool currently_editing;
+    bool currently_editing = false;
 };
 
 // Struct for saving all variables that are needed for the "Adding Annotation" Window
 struct annot_window_struct {
     // Coordinates in the Input Field
-    float coordinates_input[3];
+    float coordinates_input[3] = {0.0f, 0.0f, 0.0f};
     // Annotation in the Input Field
-    std::string annotation_input;
+    std::string annotation_input = "";
     // Sphere Color in the Input Field
-    float color_input[3];
+    //float color_input[3] = {0.0f, 0.0f, 0.0f};
     // Point Name in Input Field
-    std::string point_name_input;
+    std::string point_name_input = "";
     // Sphere Color for later use
-    glm::vec3 color;
+    glm::vec3 color = glm::vec3(0.0f,0.0f,0.0f);
     // Bool for determining if the sphere for the current coordinates should be shown
-    bool show_point;
+    bool show_point = false;
     // annotation_struct for storing all inputs into the json_obj when pressing "save"
-    annotation_struct annot_struct;
+    annotation_struct annot_struct = {};
 
     bool start_ts_set = false;
     bool end_ts_set = false;
