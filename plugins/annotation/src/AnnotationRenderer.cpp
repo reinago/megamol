@@ -64,7 +64,7 @@ AnnotationRenderer::AnnotationRenderer()
         , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
         , loadJsonFromFileSlot("loadJsonFromFile", "Loads the state of the Annotation from a Json File")
         , enableAddingAnnotationWindowSlot("Adding Annotations Window", "Enables the Window for adding new Annotations")
-        , enableJsonWindowSlot("Json Window", "Enables the Window for handling saved Annotations") //TODO: better description + name
+        , enableJsonWindowSlot("Show Annotations", "Enables the drawing of the Annotations") //TODO: change Name to describe the new function!
         , enableListWindowSlot("List Window", "Enables the Window that shows the list of all Annotations")
         , vbo(0)
         , ibo(0)
@@ -80,8 +80,8 @@ AnnotationRenderer::AnnotationRenderer()
         , my_color()
         , listWindowBooleans({false, false})
         , pointWindowSizes()
-        , first_win_coordinates_input()
-        , first_win_color_input()
+        //, first_win_coordinates_input()
+        //, first_win_color_input()
         , first_win_color()
         , tryOut(false)
         , anotherWindow(false)
@@ -354,13 +354,13 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
         this->show_json_window = true;
         determine_points_to_be_shown(call);
     } else {
-         this->show_json_window = false;
+        this->show_json_window = false;
     }
 
     if (this->enableListWindowSlot.Param<core::param::BoolParam>()->Value()) {
         list_Window(call);
     }
-    
+
     if (this->loadJsonFromFileSlot.IsDirty()) {
         this->loadJsonFromFileSlot.ResetDirty();
         loadJsonFromFileToVectors(call);
@@ -1413,12 +1413,12 @@ void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct in
     this->all_annotations.push_back(input);
     this->pointWindowSizes.push_back(glm::vec2(0.0f, 0.0f));
 
-    json_obj["Points"][this->all_annotations.size() - 1] = {
+    json_obj["Points"].push_back({
         {"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
         {"Annotation", input.annotation}, {"Point Name", input.name}, {"Start Timestamp", input.start_ts},
         {"End Timestamp", input.end_ts}, {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
         {"Camera Orientation",
-            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}};
+            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}});
 
     // Add entries to occlusionQuery and oqResults vectors:
     occlusionQuery.query.resize(occlusionQuery.query.size() + 2);

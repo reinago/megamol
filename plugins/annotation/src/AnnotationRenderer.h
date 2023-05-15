@@ -334,8 +334,8 @@ private:
     
     /** ImGUI Variables */
     float my_color;
-    float first_win_coordinates_input[3];
-    float first_win_color_input[3];
+    // float first_win_coordinates_input[3];
+    // float first_win_color_input[3];
     glm::vec3 first_win_color;
 
     bool tryOut;
