@@ -462,8 +462,9 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         }
     }
 
-    if (ImGui::Checkbox("Show Sphere", &this->annot_win_struct.show_point)) {
-        showSphereAtPoint(call, this->annot_win_struct.annot_struct.coordinates); //TODO: only shows for a short periode of time and then never again...
+    ImGui::Checkbox("Show Sphere", &this->annot_win_struct.show_point);
+    if (this->annot_win_struct.show_point) {
+        showSphereAtPoint(call, this->annot_win_struct.annot_struct.coordinates);
     }
 
     ImGui::Text("Save your Timestamps here:");
