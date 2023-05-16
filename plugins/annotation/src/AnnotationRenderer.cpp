@@ -1421,14 +1421,15 @@ void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct in
         {"Camera Orientation",
             {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}});
 
-    // Add entries to occlusionQuery and oqResults vectors:
-    occlusionQuery.query.resize(occlusionQuery.query.size() + 2);
-    occlusionQuery.result.resize(occlusionQuery.result.size() + 2);
-    occlusionQuery.resultAv.resize(occlusionQuery.resultAv.size() + 2);
-    occlusionQuery.queryStarted.resize(occlusionQuery.queryStarted.size() + 2);
-    // glDeleteQueries(occlusionQuery.size(), occlusionQuery.data());
-    glGenQueries(occlusionQuery.query.size(),
-        occlusionQuery.query.data() + occlusionQuery.query.size() - 2); // TODO: does this still work?
+    occlusionQuery.query.clear();
+    occlusionQuery.query.resize(2 * all_annotations.size());
+    occlusionQuery.result.clear();
+    occlusionQuery.result.resize(2 * all_annotations.size());
+    occlusionQuery.resultAv.clear();
+    occlusionQuery.resultAv.resize(2 * all_annotations.size());
+    occlusionQuery.queryStarted.clear();
+    occlusionQuery.queryStarted.resize(2 * all_annotations.size());
+    glGenQueries(occlusionQuery.query.size(), occlusionQuery.query.data());
 }
 
 void AnnotationRenderer::deleteAnnotation(CallRender3DGL& call, int i) {
