@@ -1080,7 +1080,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
                         xs5[k] = 0.0f;
                     }
                 } else if (startTime > endTime) {
-                    if (k >= endLine && k <= startLine) {
+                    if (k >= startLine || k <= endLine) {
                         xs5[k] = 1.0f;
                     } else {
                         xs5[k] = 0.0f;
