@@ -711,7 +711,10 @@ void AnnotationRenderer::save_slot_values_to_json() {
 
 /* Load the Slot Values from the JSON
  */
-void AnnotationRenderer::load_slot_values_from_json() {
+void AnnotationRenderer::load_slot_values_from_json() { //TODO: check for exising values in the json file!!!
+    if (this->json_obj["SlotValues"].empty()) {
+        return;
+    }
     this->linesColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["linesColor"]);
     this->sphereColorSlot.Param<core::param::ColorParam>()->SetValue(this->json_obj["SlotValues"]["sphereColor"]);
     this->sizeScalingSlot.Param<core::param::FloatParam>()->SetValue(this->json_obj["SlotValues"]["sphereSizeScaling"]);
