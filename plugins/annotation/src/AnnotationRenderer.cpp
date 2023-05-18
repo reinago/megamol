@@ -1236,23 +1236,15 @@ void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
                     glm::vec2 l2 = tempStructVector[j].screenPosition - (tempStructVector[j].windowSize * 0.5f);
                     glm::vec2 r2 = tempStructVector[j].screenPosition + (tempStructVector[j].windowSize * 0.5f);
 
+                    glm::vec2 differenceVector(differenceX,differenceY);
+
                     // Calculate Offsets
                     float x_dist = std::min(r1.x, r2.x) - std::max(l1.x, l2.x);
                     float y_dist = (std::min(r1.y, r2.y) - std::max(l1.y, l2.y));
 
-                    if (differenceX >= 0.0f && differenceY >= 0.0f) { // i is on the right and up?
-                        tempStructVector[i].offset += glm::vec2(x_dist * 0.5f, y_dist * 0.5f);
-                        tempStructVector[j].offset += glm::vec2(x_dist * -0.5f, y_dist * -0.5f);
-                    } else if (differenceX < 0.0f && differenceY >= 0.0f) { // i is on the left and up?
-                        tempStructVector[i].offset += glm::vec2(x_dist * -0.5f, y_dist * 0.5f);
-                        tempStructVector[j].offset += glm::vec2(x_dist * 0.5f, y_dist * -0.5f);
-                    } else if (differenceX >= 0.0f && differenceY >= 0.0f) { // i is on the right and down?
-                        tempStructVector[i].offset += glm::vec2(x_dist * 0.5f, y_dist * -0.5f);
-                        tempStructVector[j].offset += glm::vec2(x_dist * -0.5f, y_dist * 0.5f);
-                    } else { // i is on the left and down?
-                        tempStructVector[i].offset += glm::vec2(x_dist * -0.5f, y_dist * -0.5f);
-                        tempStructVector[j].offset += glm::vec2(x_dist * 0.5f, y_dist * 0.5f);
-                    }
+                    glm::vec2 normalizedVec = glm::normalize(differenceVector);
+                    tempStructVector[i].offset += glm::vec2(x_dist * 0.55f, y_dist * 0.55f) * normalizedVec;
+                    tempStructVector[j].offset += glm::vec2(x_dist * 0.55f, y_dist * 0.55f) * (-1.0f * normalizedVec);
                 }
             }
         }
