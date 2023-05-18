@@ -361,6 +361,12 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
         list_Window(call);
     }
 
+    for (int i = 0; i < all_annotations.size(); i++) {
+        if (this->all_annotations[i].currently_editing) {
+            editing_Annotations_Window(call, i);
+        }
+    }
+
     if (this->loadJsonFromFileSlot.IsDirty()) {
         this->loadJsonFromFileSlot.ResetDirty();
         loadJsonFromFileToVectors(call);
@@ -1171,11 +1177,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
 
                 if (ImGui::Button("Edit this Annotation")) {
                     this->all_annotations[i].currently_editing = true;
-                }
-                if (this->all_annotations[i].currently_editing) {
-                    editing_Annotations_Window(call, i);
-                }
-                    
+                }   
 
                 ImGui::TreePop();
             }
