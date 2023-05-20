@@ -1226,25 +1226,21 @@ void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
     for (int k = 0; k < 5; k++) {
         for (int i = 0; i < tempStructVector.size(); i++) {
             for (int j = i + 1; j < tempStructVector.size(); j++) {
-                float sumWidth = (tempStructVector[i].windowSize.x + tempStructVector[j].windowSize.x) * 0.5f;
-                float sumHeight = (tempStructVector[i].windowSize.y + tempStructVector[j].windowSize.y) * 0.5f;
-                float differenceX = tempStructVector[i].screenPosition.x - tempStructVector[j].screenPosition.x;
-                float differenceY = tempStructVector[i].screenPosition.y - tempStructVector[j].screenPosition.y;
+                glm::vec2 difference = tempStructVector[i].screenPosition - tempStructVector[j].screenPosition;
+                glm::vec2 sumSize = (tempStructVector[i].windowSize + tempStructVector[j].windowSize) * 0.5f;
 
-                if (std::abs(differenceX) <= sumWidth && std::abs(differenceY) <= sumHeight) {
+                if (std::abs(difference.x) <= sumSize.x && std::abs(difference.y) <= sumSize.y) {
                     // Calculate left and right points of the rectangles
                     glm::vec2 l1 = tempStructVector[i].screenPosition - (tempStructVector[i].windowSize * 0.5f);
                     glm::vec2 r1 = tempStructVector[i].screenPosition + (tempStructVector[i].windowSize * 0.5f);
                     glm::vec2 l2 = tempStructVector[j].screenPosition - (tempStructVector[j].windowSize * 0.5f);
                     glm::vec2 r2 = tempStructVector[j].screenPosition + (tempStructVector[j].windowSize * 0.5f);
 
-                    glm::vec2 differenceVector(differenceX,differenceY);
-
                     // Calculate Offsets
                     float x_dist = std::min(r1.x, r2.x) - std::max(l1.x, l2.x);
                     float y_dist = (std::min(r1.y, r2.y) - std::max(l1.y, l2.y));
 
-                    glm::vec2 normalizedVec = glm::normalize(differenceVector);
+                    glm::vec2 normalizedVec = glm::normalize(difference);
                     tempStructVector[i].offset += glm::vec2(x_dist * 0.55f, y_dist * 0.55f) * normalizedVec;
                     tempStructVector[j].offset += glm::vec2(x_dist * 0.55f, y_dist * 0.55f) * (-1.0f * normalizedVec);
                 }
