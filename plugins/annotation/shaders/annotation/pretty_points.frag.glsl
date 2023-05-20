@@ -2,7 +2,6 @@
 
 layout(location = 0) out vec4 frag_color;
 
-in vec4 myColor;
 in float radius;
 in vec2 texCoords;
 flat in vec4 pos;
@@ -10,6 +9,7 @@ flat in vec4 pos;
 uniform vec3 camDir;
 uniform vec3 camPos;
 
+uniform vec4 myColor;
 uniform mat4 mvp;
 uniform mat4 view;
 uniform mat4 model = mat4(1.0);

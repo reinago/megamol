@@ -534,7 +534,7 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     this->sphereShader->setUniform("camPos", cam_pose.position.x, cam_pose.position.y, cam_pose.position.z);
     this->sphereShader->setUniform("camDir", cam_pose.direction.x, cam_pose.direction.y, cam_pose.direction.z);
     this->sphereShader->setUniform("scalingFactor", this->sizeScalingSlot.Param<core::param::FloatParam>()->Value());
-    this->sphereShader->setUniform("color", colptr[0], colptr[1], colptr[2], colptr[3]);
+    this->sphereShader->setUniform("myColor", colptr[0], colptr[1], colptr[2], colptr[3]);
 
     // Render a point at the given coordinates
     // TODO: use a different mode
@@ -927,7 +927,7 @@ void AnnotationRenderer::showSphereAtPointIndex(CallRender3DGL& call, glm::vec3 
     this->sphereShader->setUniform("camPos", cam_pose.position.x, cam_pose.position.y, cam_pose.position.z);
     this->sphereShader->setUniform("camDir", cam_pose.direction.x, cam_pose.direction.y, cam_pose.direction.z);
     this->sphereShader->setUniform("scalingFactor", this->sizeScalingSlot.Param<core::param::FloatParam>()->Value());
-    this->sphereShader->setUniform("color", colptr[0], colptr[1], colptr[2], colptr[3]);
+    this->sphereShader->setUniform("myColor", colptr[0], colptr[1], colptr[2], colptr[3]);
 
     // Render a point at the given coordinates
     // TODO: use a different mode
