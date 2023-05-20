@@ -137,6 +137,10 @@ AnnotationRenderer::AnnotationRenderer()
     this->saveJsonToFileSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_D, core::view::Modifier::SHIFT));
     this->MakeSlotAvailable(&this->saveJsonToFileSlot);
+    
+    this->saveSlotValuesSlot.SetParameter(
+        new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
+    this->MakeSlotAvailable(&this->saveSlotValuesSlot);
 
     this->enableAddingAnnotationWindowSlot.SetParameter(new core::param::BoolParam(false));
     this->MakeSlotAvailable(&this->enableAddingAnnotationWindowSlot);
@@ -788,7 +792,10 @@ void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
             this->all_annotations[i].aviable_at_current_time = false;
         }
     }
-    forceDirectedLayout(call);
+    if (this->drawTextSlot.Param<core::param::BoolParam>()->Value()) {
+        forceDirectedLayout(call);
+    }
+    
 }
 
 /*Converts the given 3D world coordinates into 2D screen coordinates.
