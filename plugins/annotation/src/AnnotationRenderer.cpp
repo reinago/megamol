@@ -38,6 +38,7 @@
 #include "imgui_stdlib.h"
 #include "imgui_tex_inspect.h"
 
+
 using json = nlohmann::json;
 
 using namespace megamol::mmstd_gl;
@@ -51,49 +52,38 @@ struct annotation_struct;
 AnnotationRenderer::AnnotationRenderer()
         : Renderer3DModuleGL()
         , enableAnnotationRendererSlot("AnnotationRenderer", "Enables the rendering of the Annotations")
-        , sizeScalingSlot("scaling factor", "Scaling factor for the size of the rendered GL_POINTS")
+        , sizeScalingSlot("Sphere scaling factor", "Scaling factor for the size of the rendered GL_POINTS")
         , linesColorSlot("linesColor", "Color of the Connection Lines between Annotation and Point in 3D")
         , sphereColorSlot("sphereColor", "Color of the Spheres that show the position of the annotations")
         , drawTextSlot("Draw 3D Text", "Enables the drawing of a 3D Text for each Annotation")
         , titleColorSlot("Title Color", "Color for the title of Annotations")
         , textColorSlot("Text Color", "Color for the shown Annotations in the Data")
-        , wrapWidthSlot("Wraping Width for Annotations", "Sets the value for the width of the wraping of the Annotations")
-        , filename_slot("JSON File", "The path to the JSON file to use")
+        , wrapWidthSlot("Wrapping Width for Annotations", "Sets the value for the width of the wraping of the Annotations")
+        , filenameSlot("JSON File", "The path to the JSON file to use")
         , saveSlotValuesSlot("saveSlotValues", "Saves the current values of the slots")
         , loadSlotValuesSlot("loadSlotValues", "Loades the saved values of the slots")
         , saveJsonToFileSlot("saveJsonToFile", "Saves the current state of the Annotation to a Json File")
         , loadJsonFromFileSlot("loadJsonFromFile", "Loads the state of the Annotation from a Json File")
         , enableAddingAnnotationWindowSlot("Adding Annotations Window", "Enables the Window for adding new Annotations")
-        , enableJsonWindowSlot("Show Annotations", "Enables the drawing of the Annotations") //TODO: change Name to describe the new function!
+        , enableJsonWindowSlot("Show Annotations", "Enables the drawing of the Annotations")
         , enableListWindowSlot("List Window", "Enables the Window that shows the list of all Annotations")
         , vbo(0)
         , ibo(0)
         , va(0)
         , occlusionQuery()
         , frameType(0)
-        , boundingBoxes()
         , totalFrameCount(0.0f)
         , picking_enabled(false)
         , picked_a_point(false)
         , lastX()
         , lastY()
-        , my_color()
         , listWindowBooleans({false, false})
         , pointWindowSizes()
-        //, first_win_coordinates_input()
-        //, first_win_color_input()
-        , first_win_color()
-        , tryOut(false)
-        , anotherWindow(false)
         , annot_win_struct()
-        , show_json_window(false)
         , json_file_path("")
         , json_file_path_set(false)
-        , json_point_name_selectedIndex(0)
-        , grh(false)
         , all_annotations()
-        , json_obj()
-        , json_amount(0) {
+        , json_obj() {
 
     this->enableAnnotationRendererSlot.SetParameter(new core::param::BoolParam(true));
     this->MakeSlotAvailable(&this->enableAnnotationRendererSlot);
@@ -117,22 +107,18 @@ AnnotationRenderer::AnnotationRenderer()
     this->MakeSlotAvailable(&this->textColorSlot);
 
     this->wrapWidthSlot.SetParameter(new core::param::FloatParam(15.0f));
-    this->MakeSlotAvailable(&this->wrapWidthSlot); // TODO: maybe do this wrapWidthSlot with a slider?
+    this->MakeSlotAvailable(&this->wrapWidthSlot);
     
-    this->filename_slot << new core::param::FilePathParam("");
-    this->MakeSlotAvailable(&this->filename_slot);
-
-    this->saveSlotValuesSlot.SetParameter(
-        new core::param::ButtonParam(core::view::Key::KEY_A, core::view::Modifier::SHIFT));
-    this->MakeSlotAvailable(&this->saveSlotValuesSlot);
-
-    this->loadSlotValuesSlot.SetParameter(
-        new core::param::ButtonParam(core::view::Key::KEY_B, core::view::Modifier::SHIFT));
-    this->MakeSlotAvailable(&this->loadSlotValuesSlot);
+    this->filenameSlot << new core::param::FilePathParam("");
+    this->MakeSlotAvailable(&this->filenameSlot);
 
     this->loadJsonFromFileSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_C, core::view::Modifier::SHIFT));
     this->MakeSlotAvailable(&this->loadJsonFromFileSlot);
+
+    this->loadSlotValuesSlot.SetParameter(
+        new core::param::ButtonParam(core::view::Key::KEY_B, core::view::Modifier::SHIFT));
+    this->MakeSlotAvailable(&this->loadSlotValuesSlot);
 
     this->saveJsonToFileSlot.SetParameter(
         new core::param::ButtonParam(core::view::Key::KEY_D, core::view::Modifier::SHIFT));
@@ -153,10 +139,6 @@ AnnotationRenderer::AnnotationRenderer()
 
     this->json_obj["Points"];
     this->json_obj["SlotValues"];
-
-    // load the json file:
-    // TODO: loading jason from file here throws an error
-    // load_json_from_file();
 }
 
 /*
@@ -175,7 +157,6 @@ bool AnnotationRenderer::OnMouseMove(double x, double y) {
     RendererModule::OnMouseMove(x, y);
     this->lastX = x;
     this->lastY = y;
-    // printf("lastX: %f, lastY: %f", this->lastX, this->lastY);
     return false;
 }
 
@@ -191,8 +172,6 @@ bool AnnotationRenderer::OnMouseButton(megamol::core::view::MouseButton button,
     }
 
     if (action == core::view::MouseButtonAction::PRESS) {
-        printf("Hey you pressed a button\n");
-        printf("x: %f, y: %f \n", this->lastX, this->lastY);
 
         // If picking is enabled then we set the boolean picked_a_point to true, so the other functions can calculate the coordinates with the current mouse position.
         if (picking_enabled) {
@@ -280,10 +259,7 @@ bool AnnotationRenderer::GetExtents(CallRender3DGL& call) {
         *chainedCall = call;
         if ((*chainedCall)(core::view::AbstractCallRender::FnGetExtents)) {
             call = *chainedCall;
-            this->boundingBoxes = call.AccessBoundingBoxes(); //TODO: change this, because we have no bounding boxes
-            // TODO: save amount of Frames
             this->totalFrameCount = chainedCall->TimeFramesCount();
-            // printf("totalFrameCount: %f\n", this->totalFrameCount);
             return true;
         }
     }
@@ -320,8 +296,6 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
     bool renderRes = true;
     frameType = (frameType + 1) % 2;
     if (this->enableAnnotationRendererSlot.Param<core::param::BoolParam>()->Value()) {
-        //test(call);
-        // TODO: just testing new main function:
         new_main(call);
     }
 
@@ -344,21 +318,14 @@ bool AnnotationRenderer::Render(CallRender3DGL& call) {
  * This function generates the main ImGui window and allows the opening of all other windows.
  */
 void AnnotationRenderer::new_main(CallRender3DGL& call) {
-    // TODO: With this version it is not possible to close the window with the "x" button
     /* Displays the Window for adding new Annotations */
     if (this->enableAddingAnnotationWindowSlot.Param<core::param::BoolParam>()->Value()) {
-        this->anotherWindow = true;
         showAddingAnotationWindow(call, "Adding new Annotations");
-    } else {
-        this->anotherWindow = false;
     }
 
     /* Displays the Window for Handling all current Annotations */
     if (this->enableJsonWindowSlot.Param<core::param::BoolParam>()->Value()) {
-        this->show_json_window = true;
         determine_points_to_be_shown(call);
-    } else {
-        this->show_json_window = false;
     }
 
     if (this->enableListWindowSlot.Param<core::param::BoolParam>()->Value()) {
@@ -396,11 +363,11 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
     }
 
     // sets the filePath
-    if (this->filename_slot.IsDirty()) {
-        this->filename_slot.ResetDirty();
+    if (this->filenameSlot.IsDirty()) {
+        this->filenameSlot.ResetDirty();
 
         // Read data
-        const auto& filepath = this->filename_slot.Param<core::param::FilePathParam>()->Value();
+        const auto& filepath = this->filenameSlot.Param<core::param::FilePathParam>()->Value();
         json_file_path = filepath.generic_u8string();
         json_file_path_set = true; // TODO: check for valid path?
     }
@@ -410,7 +377,6 @@ void AnnotationRenderer::new_main(CallRender3DGL& call) {
 * Function for the ImGui window that allows the adding of a new point.
 */
 void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::string window_name) {
-    // Is this needed here as well?
     bool valid_imgui_scope =
         ((ImGui::GetCurrentContext() != nullptr) ? (ImGui::GetCurrentContext()->WithinFrameScope) : (false));
     if (!valid_imgui_scope)
@@ -428,7 +394,6 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     ImGui::PushTextWrapPos(ImGui::GetFontSize() * 20.0f);
     ImGui::TextUnformatted(this->annot_win_struct.annotation_input.c_str());
     ImGui::PopTextWrapPos();
-    // ImGui::Text(this->annot_win_struct.annotation_input.c_str()); // TODO: Allow \n or similar functions to work!
     ImGui::InputFloat3("input coordinates", this->annot_win_struct.coordinates_input);
 
     // save inputs in global struct variable annot_win_struct
@@ -459,10 +424,11 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         // this uses the variables lastX and lastY that are updated everytime the mouse is moved.
         if (this->picked_a_point) {
             glm::vec3 picked_point = calcClickedPoint(this->lastX, this->lastY, call);
-            // are these texts even needed? because they will just vanish after 1 frame
+            
             ImGui::Text("Picked a point!");
             ImGui::Text("x: %f, y: %f, z: %f", picked_point.x, picked_point.y, picked_point.z);
             this->annot_win_struct.annot_struct.coordinates = picked_point;
+            
             // this conversion is needed to show the coordinates in the ImGui window
             this->annot_win_struct.coordinates_input[0] = picked_point.x;
             this->annot_win_struct.coordinates_input[1] = picked_point.y;
@@ -498,7 +464,6 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     ImGui::EndDisabled();
     
     if (ImGui::Button("Save current coords and Annotation")) {
-        // TODO: CLEAR all inputs of the imgui variables in this window after saving the new point (to prevent dupplications etc)?
         // save_new_point_to_json(call, this->annot_win_struct.annot_struct);
         saveNewPoint(call, this->annot_win_struct.annot_struct);
         // reset the inputs
@@ -516,7 +481,6 @@ void AnnotationRenderer::print_coords(glm::vec3 coords) {
 
 /* Draw a sphere at the coordinates given in the vec3 */
 void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coords) {
-    // TODO: currently the sphere is ALWAYS in the front? (even when it SHOULD be behind other objects)
     core::view::Camera cam = call.GetCamera();
     auto view = cam.getViewMatrix();
     auto proj = cam.getProjectionMatrix();
@@ -541,28 +505,9 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     this->sphereShader->setUniform("myColor", colptr[0], colptr[1], colptr[2], colptr[3]);
 
     // Render a point at the given coordinates
-    // TODO: use a different mode
     glBegin(GL_POINTS);
     glVertex3f(current[0], current[1], current[2]); 
     glEnd();
-
-
-    // TODO: THIS NEEDS SOME WORK
-    /*this->lineShader->use();
-
-    glm::vec3 bbmin = current;
-    glm::vec3 bbmax = glm::vec3(1.0f, 1.0f, 1.0f);
-
-    this->lineShader->setUniform("mvp", mvp);
-    this->lineShader->setUniform("bbMin", bbmin);
-    this->lineShader->setUniform("bbMax", bbmax);
-    this->lineShader->setUniform("color", colptr[0], colptr[1], colptr[2]);
-
-    glBegin(GL_LINES);
-    glVertex3f(current[0], current[1], current[2]);
-    glVertex3f(1.0f, 1.0f, 1.0f);
-    glColor3f(colptr[0], colptr[1], colptr[2]);
-    glEnd();*/
     glDisable(GL_DEPTH_TEST);
 }
 
@@ -609,18 +554,16 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
             // For saving the window Sizes
             this->pointWindowSizes[i] = glm::vec2(0.0f, 0.0f);
         }
-        // generates the window for one frame and then saves the size of it to the vector: pointWindowSizes[i]
-        // display_visual_points_windows(call, this->all_annotations[i].name, i, this->all_annotations[i].coordinates, ImVec2(0.0f,0.0f), false, true);
     }
     for (int i = 0; i < pointWindowSizes.size(); ++i) {
         display_visual_points_windows(call, this->all_annotations[i].name, i, this->all_annotations[i].coordinates,
             glm::vec2(0.0f, 0.0f), false, true);
     }
     // Case that we have LESS points in json_obj then we have entries in all_annotations:
-    // TODO: check if this works, need the remove from json_obj function for this.
     if (iterate < all_annotations.size()) {
         all_annotations.erase(std::next(all_annotations.begin(), iterate + 1), all_annotations.end()); 
     }
+    // Generate the Queries for testing if the point is visible at the current time
     occlusionQuery.query.clear();
     occlusionQuery.query.resize(2 * all_annotations.size());
     occlusionQuery.result.clear();
@@ -639,7 +582,6 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
     // check if the all_annotations vector is empty and if so then exit
     if (this->all_annotations.empty())
         return;
-    // TODO: Check for the case that selectedIndex was NOT updated after json_point_names WAS updated => index out of bounds etc!
 
     ImGui::Begin(windowName.c_str(), &window_open);
     ImGui::Text("Annotation");
@@ -660,9 +602,7 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
     ImGui::End();
 }
 
-// TODO: does this cause problems if the current project is NOT loaded BUT thrown together in the editor?
-/* TODO : Can it come to problems when a project file is loaded and then mmClearGraph() is called and a new project file is called?
-=> also what if instead of loading a new Project a project gets thrown together? (I think in this case it OVERWRITES the Json of the old first loaded Project)... */ 
+
 /*
  * Returns the file Path to the json file.
  * This file will be in the same folder as the given project file.
@@ -690,7 +630,6 @@ std::string AnnotationRenderer::determineJsonFilePath() const {
  * The value at this index is then returned.
  */
 glm::vec3 AnnotationRenderer::calcClickedPoint(int x, int y, CallRender3DGL& call) {
-    // TODO: (what to do if there are holes in the data?)
     // IMPORTANT: the input x,y are counted from the TOP left corner of the screen, NOT from the bottom left corner!
 
     auto const lhsFBO = call.GetFramebuffer();
@@ -721,7 +660,8 @@ void AnnotationRenderer::save_slot_values_to_json() {
 
 /* Load the Slot Values from the JSON
  */
-void AnnotationRenderer::load_slot_values_from_json() { //TODO: check for exising values in the json file!!!
+void AnnotationRenderer::load_slot_values_from_json() {
+    // check for the existence of the slots in the json file
     if (this->json_obj["SlotValues"].empty()) {
         return;
     }
@@ -743,7 +683,7 @@ void AnnotationRenderer::loadCameraPosition(CallRender3DGL& call, glm::vec3 inpu
     std::string camOrientString = "mmSetParamValue(\"::view::cam::orientation\",[=[" + std::to_string(inputCamOrient[0]) + std::string(";") +
         std::to_string(inputCamOrient[1]) + std::string(";") + std::to_string(inputCamOrient[2]) + std::string(";") +
         std::to_string(inputCamOrient[3]) + std::string("]=])");
-    // TODO: This version ONLY works for the "test" project file, because others have different path names...
+    // This version only works, if the view Module is called ::view::... otherwise it cannot set the values.
     (*thingy)(camPosString);
     (*thingy)(camOrientString);
     std::cout << camPosString << std::endl;
@@ -761,8 +701,8 @@ void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
     }
     float currentTimeStamp = call.Time();
     for (int i = 0; i < all_annotations.size(); ++i) {
-        // TODO: check if this works so now with the Edge case...
-        // This is a long if because it has the two cases: start_ts <= end_ts and start_ts > end_ts and each case needs a different check
+        // This is a long if because it has the two cases:
+        // start_ts <= end_ts and start_ts > end_ts and each case needs a different check
         // for if the current time is in the time span
         if ((all_annotations[i].start_ts <= all_annotations[i].end_ts &&
             currentTimeStamp >= all_annotations[i].start_ts && currentTimeStamp <= all_annotations[i].end_ts)
@@ -865,12 +805,14 @@ void AnnotationRenderer::display_visual_points_windows(
     if (this->listWindowBooleans.opaqueWindowsOfPoints) {
         window_flags |= ImGuiWindowFlags_NoBackground;
     }
-    // window_flags |= ImGuiWindowFlags_NoBackground;
+    
     window_flags |= ImGuiWindowFlags_NoTitleBar;
     window_flags |= ImGuiWindowFlags_NoResize;
     window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+    
     bool* p_open = NULL;
-    std::string windowNameString = windowName + std::string("##") + std::to_string(curr_index); // Needed to differenciate between this window and the other windows
+    // Needed to differenciate between different windows with the same windowName
+    std::string windowNameString = windowName + std::string("##") + std::to_string(curr_index);
 
     float wrap_width = this->wrapWidthSlot.Param<core::param::FloatParam>()->Value();
     
@@ -885,7 +827,7 @@ void AnnotationRenderer::display_visual_points_windows(
     ImVec4 titleColor = ImVec4(titleColorIn[0], titleColorIn[1], titleColorIn[2], titleColorIn[3]);
     
     ImGui::Begin(windowNameString.c_str(), p_open, window_flags);
-    ImGui::PushTextWrapPos(ImGui::GetFontSize() * wrap_width); // TODO: change 15.0f out with: wrap_width
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * wrap_width);
     ImGui::TextColored(titleColor, windowName.c_str());
     ImGui::TextColored(textColor, this->all_annotations[curr_index].annotation.c_str());
     ImGui::PopTextWrapPos();
@@ -912,7 +854,6 @@ void AnnotationRenderer::display_visual_points_windows(
 * This is used to check if the drawn point is visible or not.
 */
 void AnnotationRenderer::showSphereAtPointIndex(CallRender3DGL& call, glm::vec3 coords, int index) {
-    // TODO: currently the sphere is ALWAYS in the front? (even when it SHOULD be behind other objects)
     core::view::Camera cam = call.GetCamera();
     auto view = cam.getViewMatrix();
     auto proj = cam.getProjectionMatrix();
@@ -937,7 +878,7 @@ void AnnotationRenderer::showSphereAtPointIndex(CallRender3DGL& call, glm::vec3 
     this->sphereShader->setUniform("myColor", colptr[0], colptr[1], colptr[2], colptr[3]);
 
     // Render a point at the given coordinates
-    // TODO: use a different mode
+    // Start the query for the point
     glBeginQuery(GL_ANY_SAMPLES_PASSED, this->occlusionQuery.query[2 * index + frameType]);
     glBegin(GL_POINTS);
     glVertex3f(current[0], current[1], current[2]);
@@ -948,9 +889,8 @@ void AnnotationRenderer::showSphereAtPointIndex(CallRender3DGL& call, glm::vec3 
 }
 
 /* ImGui Window that holds all annotations.
- * This includes a list of all annotations  TODO: (and a text field to add new annotations.)
- * TODO: Also a button to delete the selected annotation.
- * A timeline next to each annotation that shows when the annotation is visible timewise
+ * This includes a list of all annotations.
+ * A timeline next to each annotation that shows when the annotation is visible timewise.
  * Different colors for the names depending on if the annotation is visible in time and space.
  */
 void AnnotationRenderer::list_Window(CallRender3DGL& call) {
@@ -964,13 +904,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
         window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
     
     ImGui::Begin("Annotation List", p_open, window_flags);
-    // list all annotation names
-    //ImGui::BeginTabBar("#Lists");
-    //for (int i = 0; i < this->all_annotations.size(); i++) {
-
-    //}
-    // Taken From IMGUI DEMO:
-    // Just for seeing the code right now
     static ImGuiTableFlags flags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH |
                                    ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg |
                                    ImGuiTableFlags_NoBordersInBody;
@@ -979,7 +912,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
     ImGui::Text("Change Flags for this window:");
     ImGui::Checkbox("Allow Automatic Resizing of this window", &this->listWindowBooleans.autoResize);
     ImGui::Checkbox("Turn Points Window opaque", &this->listWindowBooleans.opaqueWindowsOfPoints);
-    // TODO: More Flags?
     
     if (ImGui::BeginTable("3ways", 5, flags)) {
         // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
@@ -990,8 +922,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
         ImGui::TableSetupColumn("Deleting Point", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
         ImGui::TableHeadersRow();
 
-        // TODO: Allow sorting of entries!
-
         // This is a line for the Explanations of the different columns
         ImGui::TableNextRow();
         ImGui::TableNextColumn();
@@ -1001,11 +931,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
         if (ImGui::IsItemHovered()) {
             ImGui::BeginTooltip();
             ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-            //std::string tooltipText = "There are three possible colors and names for the visibility of an Annotation.\n\n"
-            //                          "Visible - Green: This Annotation is visible on screen right now.\n"
-            //                          "Obscurred - Yellow: This Annotation is currently behind Objects in the scene.\n"
-            //                          "Hidden - Red: This Annotation is currently not visible in any way."; // TODO: maybe change these lines a bit...
-            //ImGui::TextUnformatted(tooltipText.c_str());
             ImGui::TextUnformatted("There are three possible colors and names for the visibility of an Annotation.");
             ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Visible");
             ImGui::SameLine();
@@ -1018,7 +943,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
             ImGui::Text("This Annotation is currently not visible in any way.");
             ImGui::PopTextWrapPos();
             ImGui::EndTooltip();
-        } // TODO: ADD COLORBLIND MODE!!!!
+        }
 
         ImGui::TableNextColumn();
         int amountLines = 100.0f;
@@ -1056,8 +981,6 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
         }
         
         // loop over all annotations in all_annotations
-        // entries will be: name, timeline
-        // collapsed for each entry: annotation text, change annotation, jump to annotation
         for (int i = 0; i < this->all_annotations.size(); i++) {
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
@@ -1074,7 +997,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
                 text1 = "Obscurred";
                 color1 = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); // yellow
             } else {
-                text1 = "Hidden"; // TODO: better word... it is after all not just hidden, but also just not in the current timeframe...
+                text1 = "Hidden";
                 color1 = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // red
             }
             ImGui::TextColored(color1, text1.c_str());
@@ -1137,50 +1060,10 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
                     std::string tttt = " mmSetParamValue(\"::view::anim::time\", [=[" +
                                        std::to_string(this->all_annotations[i].start_ts) + "]=])";
                     (*thingy)(tttt);
-                    // TODO: Set Time does not work this way?
                 }
                 std::string open_string = "Open Change Options##" + std::to_string(i);
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                //bool open_changes = ImGui::TreeNodeEx(open_string.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
-                //if (open_changes) {
-                //    ImGui::TableNextRow();
-                //    ImGui::TableNextColumn();
-                //    ImGui::Text("Change Annotation");
-                //    ImGui::TableNextColumn();
-                //    ImGui::InputText("Annotation", &this->all_annotations[i].annotation);
-                //    //ImGui::Text(this->all_annotations[i].annotation.c_str());
-                //    ImGui::TableNextRow();
-                //    ImGui::TableNextColumn();
-                //    ImGui::Text("Change Coordinate of Point");
-                //    ImGui::TableNextColumn();
-                //    // Button for starting the picking process
-                //    if (ImGui::Button("Click in the viewport to add a new point##2")) {
-                //        this->picking_enabled = true;
-                //    }
-
-                //    if (this->picking_enabled) {
-                //    ImGui::Text("Click in the viewport to add a new point");
-                //    // Wait till the user has clicked in the Window and then calculate the coordinates from this point.
-                //    // this uses the variables lastX and lastY that are updated everytime the mouse is moved.
-                //    if (this->picked_a_point) {
-                //        glm::vec3 picked_point = calcClickedPoint(this->lastX, this->lastY, call);
-                //        // are these texts even needed? because they will just vanish after 1 frame
-                //        ImGui::Text("Picked a point!");
-                //        ImGui::Text("x: %f, y: %f, z: %f", picked_point.x, picked_point.y, picked_point.z);
-                //        this->annot_win_struct.annot_struct.coordinates = picked_point;
-                //        // this conversion is needed to show the coordinates in the ImGui window
-                //        this->all_annotations[i].coordinates = picked_point;
-                //        this->picked_a_point = false;
-                //        this->picking_enabled = false;
-                //        }
-                //    }
-                //    
-                //    if (ImGui::Button("Update the json_obj with current values")) {
-                //        updateAnnotationInJsonObj(call, i); // TODO: add struct as import => can change as wanted
-                //    }
-                //    ImGui::TreePop();
-                //}
 
                 if (ImGui::Button("Edit this Annotation")) {
                     this->all_annotations[i].currently_editing = true;
@@ -1202,14 +1085,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
 
 /* Function that implements a sort of Spring Embedder for the Shown Annotations on screen to prevent overlapping. */
 void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
-    // Idea: Place first window as normal.
-    // Then, for every other window, check if it overlaps with the first window.
-    // If it does, move it to the right.
-    // Then, check if it overlaps with any other window.
-    // If it does, move it to the right.
-    // Repeat until no overlap is detected.
-    // Then, place the next window as normal.
-    // Repeat until all windows are placed.
+    // strzct for saving the important position information for each annotation that is shown on screen
     struct tempStruct {
         int indexAllAnnot;        // index of the annotation in the all_annotations vector
         glm::vec2 screenPosition; // screen position of the annotation (middle point)
@@ -1230,7 +1106,7 @@ void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
     }
 
     // iterate over the triangle of all Windows that need to be placed...
-    for (int k = 0; k < 5; k++) {
+    for (int k = 0; k < 10; k++) {
         for (int i = 0; i < tempStructVector.size(); i++) {
             for (int j = i + 1; j < tempStructVector.size(); j++) {
                 glm::vec2 difference = tempStructVector[i].screenPosition - tempStructVector[j].screenPosition;
@@ -1267,7 +1143,6 @@ void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
 
 /* Function that draws a connection line between an ImGui window and the given coordinates in 3D. */
 void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos) {
-    // TODO: add variable for changing the line color?
     auto& colptr = this->linesColorSlot.Param<core::param::ColorParam>()->Value();
     glm::vec3 lineColor = glm::vec3(1.0f, 1.0f, 1.0f);
     auto cam = call.GetCamera();
@@ -1275,11 +1150,6 @@ void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 wind
     auto proj = cam.getProjectionMatrix();
     auto mvp = proj * view;
     float z = -1.0f;
-
-    /*Line too short when using NearPlane as z.
-    When using z = 0.0f then the line IS drawn to the correct location AND has a good length
-    BUT then it can be obscurred by other objects in the scene, that should not be in front of the line.
-    BUT with z = -1.0f it somehow works... (at least for data sets, that are inside of the "Einheitswürfel")*/
 
     // convert windowPos to world Space coordinates
     glm::vec3 convertedScreenPos = getWorldCoordsFromScreenPos(call, windowPos.x, windowPos.y, z, true);
@@ -1299,10 +1169,11 @@ void AnnotationRenderer::drawConnectionLine(CallRender3DGL& call, glm::vec2 wind
 
 void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int index) {
     ImGuiWindowFlags window_flags = 0;
-    
+
+    // Needed to differenciate between different windows with the same windowName
     std::string windowNameString =
         "Editing Annotation: " + this->all_annotations[index].name + std::string("##") +
-        std::to_string(index); // Needed to differenciate between this window and the other windows (does not work)
+        std::to_string(index);
     float wrap_width = this->wrapWidthSlot.Param<core::param::FloatParam>()->Value();
     
     ImGui::Begin(windowNameString.c_str(), &this->all_annotations[index].currently_editing , window_flags);
@@ -1315,7 +1186,7 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
     ImGui::Text("Change Coordinate of Point");
     
     // Button for starting the picking process
-    if (ImGui::Button("Click in the viewport##2")) { // TODO: change description of this Button?
+    if (ImGui::Button("Click in the viewport##2")) {
         this->picking_enabled = true;
     }
 
@@ -1325,10 +1196,11 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
         // this uses the variables lastX and lastY that are updated everytime the mouse is moved.
         if (this->picked_a_point) {
             glm::vec3 picked_point = calcClickedPoint(this->lastX, this->lastY, call);
-            // are these texts even needed? because they will just vanish after 1 frame
+            
             ImGui::Text("Picked a point!");
             ImGui::Text("x: %f, y: %f, z: %f", picked_point.x, picked_point.y, picked_point.z);
             this->annot_win_struct.annot_struct.coordinates = picked_point;
+            
             // this conversion is needed to show the coordinates in the ImGui window
             this->all_annotations[index].coordinates = picked_point;
             this->picked_a_point = false;
@@ -1337,7 +1209,7 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
     }
 
     // Button for saving the current camera position
-    if (ImGui::Button("Update camera to current camera position")) { // TODO: better wording?
+    if (ImGui::Button("Update camera to current camera position")) {
         this->all_annotations[index].cam_pos = call.GetCamera().getPose().position;
         this->all_annotations[index].cam_orientation = call.GetCamera().getPose().to_quat();
     }
@@ -1358,7 +1230,6 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
 /* Load the Json file and then call another function to save the data to all_annotations vector.
 This function preserves all previously aviable data. */
 void AnnotationRenderer::loadJsonFromFileToVectors(CallRender3DGL& call) {
-    // TODO: change the path to the path of the json file
     std::string file_path = "";
     if (json_file_path_set) {
         file_path = this->json_file_path;
@@ -1373,9 +1244,6 @@ void AnnotationRenderer::loadJsonFromFileToVectors(CallRender3DGL& call) {
     std::ifstream i(file_path);
     nlohmann::json tempJson;
     i >> tempJson;
-    // TODO: this line is ONLY for debugging...
-    if (IsDebuggerPresent)
-        std::cout << std::setw(4) << tempJson << std::endl;
 
     for (auto& element : tempJson["Points"].items()) {
         this->json_obj["Points"].push_back(element.value());
@@ -1384,6 +1252,7 @@ void AnnotationRenderer::loadJsonFromFileToVectors(CallRender3DGL& call) {
     for (auto& element : tempJson["SlotValues"].items()) {
         this->json_obj["SlotValues"][element.key()] = element.value();
     }
+    tempJson.clear();
 
     // now write the names to the and bools to the vector
     write_json_obj_data_to_vectors(call, true);
@@ -1435,7 +1304,6 @@ void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct in
 void AnnotationRenderer::deleteAnnotation(CallRender3DGL& call, int i) {
     this->all_annotations.erase(this->all_annotations.begin() + i);
     this->json_obj["Points"].erase(this->json_obj["Points"].begin() + i);
-    std::cout << std::setw(4) << json_obj << std::endl; // TODO: remove this line...?
 }
 
 /* Load the values of the given Annotation from the json_obj and save them in all_annotations[i] */

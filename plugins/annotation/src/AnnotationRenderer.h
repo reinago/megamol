@@ -22,7 +22,6 @@
 #include "mmstd_gl/ModuleGL.h"
 #include "mmstd_gl/renderer/CallRender3DGL.h"
 #include "mmstd_gl/renderer/Renderer3DModuleGL.h"
-#include "mmcore_gl/utility/SDFFont.h"
 #include "ScriptPaths.h"
 
 #include "FrontendResource.h"
@@ -66,19 +65,17 @@ struct annot_window_struct {
     float coordinates_input[3] = {0.0f, 0.0f, 0.0f};
     // Annotation in the Input Field
     std::string annotation_input = "";
-    // Sphere Color in the Input Field
-    //float color_input[3] = {0.0f, 0.0f, 0.0f};
     // Point Name in Input Field
     std::string point_name_input = "";
-    // Sphere Color for later use
-    glm::vec3 color = glm::vec3(0.0f,0.0f,0.0f);
     // Bool for determining if the sphere for the current coordinates should be shown
     bool show_point = false;
     // annotation_struct for storing all inputs into the json_obj when pressing "save"
     annotation_struct annot_struct = {};
-
+    // Bool for saving if the Start TS was set by the user
     bool start_ts_set = false;
+    // Bool for saving if the End TS was set by the user
     bool end_ts_set = false;
+    // Bool for saving if the Camera Position was set by the user
     bool camera_set = false;
 };
 
@@ -96,7 +93,9 @@ struct occlusionQueries {
 struct listWindowStruct {
     // This is for enabeling and disabeling Deletion of annotations.
     bool allowDeletion = false;
+    // This is for enabling the autoResize feature of the List window
     bool autoResize = true;
+    // This allows the user to show or hide the background of the point windows
     bool opaqueWindowsOfPoints = true;
 };
 
@@ -201,20 +200,15 @@ private:
     /** Shader program for lines */
     std::unique_ptr<glowl::GLSLProgram> lineShader;
 
-    /** Bounding Boxes */
-    megamol::core::BoundingBoxes_2 boundingBoxes;
-
-    /* Main function that holds all the connections to calling other functions */
-    void new_main(megamol::mmstd_gl::CallRender3DGL& call);
-
-
-
     /** The simple shader for the drawing of GL_POINTS */
     std::unique_ptr<glowl::GLSLProgram> simpleShader;
 
     /** The pretty shader that draws spheres*/
     std::unique_ptr<glowl::GLSLProgram> sphereShader;
+    
 
+    /* Main function that holds all the connections to calling other functions */
+    void new_main(megamol::mmstd_gl::CallRender3DGL& call);
 
     void print_coords(glm::vec3 coords);
 
@@ -233,7 +227,6 @@ private:
 
     void load_slot_values_from_json();
 
-    /* Calculate the coordinates for a given clicked */
     glm::vec3 calcClickedPoint(int x, int y, megamol::mmstd_gl::CallRender3DGL& call);
 
     std::string determineJsonFilePath() const;
@@ -269,16 +262,20 @@ private:
     void deleteAnnotation(megamol::mmstd_gl::CallRender3DGL& call, int i);
 
     void loadOldValuesFromJsonobj(megamol::mmstd_gl::CallRender3DGL& call, int i);
+
     
     /* Parameters */
+    
     /** Slot for the scaling factor of the pointsize*/
     core::param::ParamSlot sizeScalingSlot;
 
+    /* Slot for the color of the Spheres */
     core::param::ParamSlot sphereColorSlot;
 
+    /* Slot for the color of the Lines */
     core::param::ParamSlot linesColorSlot;
 
-    /* Slot for enabling the drawing with Fonts */
+    /* Slot for enabling the drawing of the Point Windows */
     core::param::ParamSlot drawTextSlot;
 
     /* Slot for changing the Color of the Text of drawn Annotations */
@@ -287,15 +284,16 @@ private:
     /* Slot for changing the Color of the Title of drawn Annotations */
     core::param::ParamSlot titleColorSlot;
 
-    // gives the depth buffer to the renderer
-    // megamol::core::CallerSlot get_depth_buffer;
-
+    /* Slot for saving the Values of some Slots */
     core::param::ParamSlot saveSlotValuesSlot;
 
+    /* Slot for loading the Values of some Slots */
     core::param::ParamSlot loadSlotValuesSlot;
 
+    /* Slot for loading the Annotations from a Json file */
     core::param::ParamSlot loadJsonFromFileSlot;
 
+    /* Slot for saving the Annotations to a Json file */
     core::param::ParamSlot saveJsonToFileSlot;
 
     /* Slot for enabling the Window for adding new Annotations */
@@ -310,11 +308,14 @@ private:
     /* Slot for changing the Wraping in the Annotations */
     core::param::ParamSlot wrapWidthSlot;
 
-    core::param::ParamSlot filename_slot;
+    /* Slot for setting the Path to the Json file */
+    core::param::ParamSlot filenameSlot;
+
     
     /*
     VARIABLES
     */
+
     /* Frames Variables */
     // stores the total number of frames of the animation
     float totalFrameCount;
@@ -322,48 +323,43 @@ private:
     // stores if the frame is even or uneven (0 or 1)
     int frameType;
 
+    
     /* GL variables */
     occlusionQueries occlusionQuery;
+
     
-    /** Picking Variables */
+    /* Picking Variables */
     bool picking_enabled;
     bool picked_a_point;
 
-    /** Last mouse position (for deprecation mapping) */
-    float lastX, lastY;
     
-    /** ImGUI Variables */
-    float my_color;
-    // float first_win_coordinates_input[3];
-    // float first_win_color_input[3];
-    glm::vec3 first_win_color;
+    /* Last mouse position (for deprecation mapping) */
+    float lastX, lastY;
 
-    bool tryOut;
-
-    bool anotherWindow;
-
-    bool show_json_window;
-
-    /* ImGui Second Window Variables */
+    
+    /* ImGui Adding Annotations Window Variables */
     annot_window_struct annot_win_struct;
 
+    
+    /* Annotations */
+    // Stores all Annotations and their data
+    std::vector<annotation_struct> all_annotations;
+    
+    // Stores the window sizes of all Annotations
     std::vector<glm::vec2> pointWindowSizes;
 
-    bool grh;
-
-    std::vector<annotation_struct> all_annotations;
-
-    /** ImGui List Variables */
+    
+    /* ImGui List Variables */
     listWindowStruct listWindowBooleans;
 
     /* json Variables */
-
+    // Stores the json object
     nlohmann::json json_obj;
-    int json_amount;
+    
+    // Stores the path to the json file
     std::string json_file_path;
+    
+    // Stores the toggle, if a json path was given by the user
     bool json_file_path_set;
-
-    int json_point_name_selectedIndex;
-
 };
 } // namespace megamol::annotation
