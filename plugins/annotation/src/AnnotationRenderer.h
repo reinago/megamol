@@ -200,9 +200,6 @@ private:
     /** Shader program for lines */
     std::unique_ptr<glowl::GLSLProgram> lineShader;
 
-    /** The simple shader for the drawing of GL_POINTS */
-    std::unique_ptr<glowl::GLSLProgram> simpleShader;
-
     /** The pretty shader that draws spheres*/
     std::unique_ptr<glowl::GLSLProgram> sphereShader;
     

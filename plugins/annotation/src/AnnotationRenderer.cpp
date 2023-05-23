@@ -192,8 +192,6 @@ bool AnnotationRenderer::create() {
     try {
         lineShader = core::utility::make_glowl_shader("simpleLine", shader_options,
             "annotation/simple_line.vert.glsl", "annotation/simple_line.frag.glsl");
-        simpleShader = core::utility::make_glowl_shader("simplePoints", shader_options,
-            "annotation/simple_points.vert.glsl", "annotation/simple_points.frag.glsl");
         sphereShader =
             core::utility::make_glowl_shader("prettyPoints", shader_options, "annotation/pretty_points.vert.glsl",
                 "annotation/pretty_points.geom.glsl", "annotation/pretty_points.frag.glsl");
@@ -686,8 +684,6 @@ void AnnotationRenderer::loadCameraPosition(CallRender3DGL& call, glm::vec3 inpu
     // This version only works, if the view Module is called ::view::... otherwise it cannot set the values.
     (*thingy)(camPosString);
     (*thingy)(camOrientString);
-    std::cout << camPosString << std::endl;
-    std::cout << camOrientString << std::endl;
     print_coords(inputCamPos);
 }
 
