@@ -77,6 +77,8 @@ struct annot_window_struct {
     bool end_ts_set = false;
     // Bool for saving if the Camera Position was set by the user
     bool camera_set = false;
+    // Color for the sphere of the current point
+    float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 };
 
 struct occlusionQueries {
@@ -209,7 +211,7 @@ private:
 
     void print_coords(glm::vec3 coords);
 
-    void showSphereAtPoint(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords);
+    void showSphereAtPoint(megamol::mmstd_gl::CallRender3DGL& call, glm::vec3 coords, float color[4]);
 
     void showAddingAnotationWindow(megamol::mmstd_gl::CallRender3DGL& call, std::string window_name);
 

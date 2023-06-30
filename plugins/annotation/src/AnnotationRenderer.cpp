@@ -436,9 +436,11 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         }
     }
 
+    ImGui::ColorEdit4("Set Color of Sphere", this->annot_win_struct.color);
+
     ImGui::Checkbox("Show Sphere", &this->annot_win_struct.show_point);
     if (this->annot_win_struct.show_point) {
-        showSphereAtPoint(call, this->annot_win_struct.annot_struct.coordinates);
+        showSphereAtPoint(call, this->annot_win_struct.annot_struct.coordinates, this->annot_win_struct.color);
     }
 
     ImGui::Text("Save your Timestamps here:");
@@ -465,7 +467,12 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         // save_new_point_to_json(call, this->annot_win_struct.annot_struct);
         saveNewPoint(call, this->annot_win_struct.annot_struct);
         // reset the inputs
-        this->annot_win_struct = {}; 
+        this->annot_win_struct = {};
+        auto& colptr = this->sphereColorSlot.Param<core::param::ColorParam>()->Value();
+        this->annot_win_struct.color[0] = colptr[0];
+        this->annot_win_struct.color[1] = colptr[1];
+        this->annot_win_struct.color[2] = colptr[2];
+        this->annot_win_struct.color[3] = colptr[3];
     }
     ImGui::End();
 }
@@ -478,14 +485,12 @@ void AnnotationRenderer::print_coords(glm::vec3 coords) {
 }
 
 /* Draw a sphere at the coordinates given in the vec3 */
-void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coords) {
+void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coords, float color[4]) {
     core::view::Camera cam = call.GetCamera();
     auto view = cam.getViewMatrix();
     auto proj = cam.getProjectionMatrix();
     auto mvp = proj * view;
     auto cam_pose = cam.get<core::view::Camera::Pose>();
-
-    auto& colptr = this->sphereColorSlot.Param<core::param::ColorParam>()->Value();
 
     glm::vec3 current = coords;
     glEnable(GL_DEPTH_TEST);
@@ -500,7 +505,7 @@ void AnnotationRenderer::showSphereAtPoint(CallRender3DGL& call, glm::vec3 coord
     this->sphereShader->setUniform("camPos", cam_pose.position.x, cam_pose.position.y, cam_pose.position.z);
     this->sphereShader->setUniform("camDir", cam_pose.direction.x, cam_pose.direction.y, cam_pose.direction.z);
     this->sphereShader->setUniform("scalingFactor", this->sizeScalingSlot.Param<core::param::FloatParam>()->Value());
-    this->sphereShader->setUniform("myColor", colptr[0], colptr[1], colptr[2], colptr[3]);
+    this->sphereShader->setUniform("myColor", color[0], color[1], color[2], color[3]);
 
     // Render a point at the given coordinates
     glBegin(GL_POINTS);
@@ -587,7 +592,7 @@ void AnnotationRenderer::display_window_of_selected_json_point(CallRender3DGL& c
     ImGui::Text(this->all_annotations[curr_index].annotation.c_str());
     ImGui::InputFloat3("Test input", (float*)&this->all_annotations[curr_index].coordinates);
 
-    showSphereAtPoint(call, this->all_annotations[curr_index].coordinates);
+    showSphereAtPoint(call, this->all_annotations[curr_index].coordinates, this->annot_win_struct.color);
     // ImGui::Button
     if (ImGui::Button("Update the json_obj with current values"))
         updateAnnotationInJsonObj(call, curr_index);
