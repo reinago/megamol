@@ -1273,7 +1273,18 @@ void AnnotationRenderer::updateAnnotationInJsonObj(CallRender3DGL& call, int i) 
 /* Saves the current state of the variable "json_obj" into the json file for the currently used project.
  */
 void AnnotationRenderer::save_json_to_file() {
-    std::ofstream o(determineJsonFilePath());
+    std::string file_path = "";
+    if (json_file_path_set) {
+        file_path = this->json_file_path;
+    } else {
+        file_path = determineJsonFilePath();
+        if (file_path.empty()) {
+            // this is just a warning message on the console that is not nessecerily something for the "regular" user
+            std::cout << "There is no file to be loaded" << std::endl;
+            return;
+        }
+    }
+    std::ofstream o(file_path);
     o << std::setw(4) << this->json_obj << std::endl;
 }
 
