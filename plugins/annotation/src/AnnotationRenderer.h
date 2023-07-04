@@ -57,6 +57,9 @@ struct annotation_struct {
     glm::quat cam_orientation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
     bool currently_editing = false;
+    // String for Tags of the Annotations for filtering
+    std::string tag = "";
+    
 };
 
 // Struct for saving all variables that are needed for the "Adding Annotation" Window
@@ -79,6 +82,9 @@ struct annot_window_struct {
     bool camera_set = false;
     // Color for the sphere of the current point
     float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    // String for Tags of the Annotations for filtering
+    std::string tag = "";
+    bool tag_set = false;
 };
 
 struct occlusionQueries {
@@ -244,7 +250,7 @@ private:
     void list_Window(megamol::mmstd_gl::CallRender3DGL& call);
 
     void forceDirectedLayout(
-        megamol::mmstd_gl::CallRender3DGL& call);
+        megamol::mmstd_gl::CallRender3DGL& call, std::string tagName);
 
     void drawConnectionLine(megamol::mmstd_gl::CallRender3DGL& call, glm::vec2 windowPos, glm::vec3 worldPos);
 
@@ -261,6 +267,8 @@ private:
     void deleteAnnotation(megamol::mmstd_gl::CallRender3DGL& call, int i);
 
     void loadOldValuesFromJsonobj(megamol::mmstd_gl::CallRender3DGL& call, int i);
+
+    void testingFunction(megamol::mmstd_gl::CallRender3DGL& call, std::string wantedTag);
 
     
     /* Parameters */
@@ -309,6 +317,9 @@ private:
 
     /* Slot for setting the Path to the Json file */
     core::param::ParamSlot filenameSlot;
+
+    /* Slot for setting the Tag that is shown */
+    core::param::ParamSlot shownTagsSlot;
 
     
     /*

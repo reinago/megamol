@@ -67,6 +67,7 @@ AnnotationRenderer::AnnotationRenderer()
         , enableAddingAnnotationWindowSlot("Adding Annotations Window", "Enables the Window for adding new Annotations")
         , enableJsonWindowSlot("Show Annotations", "Enables the drawing of the Annotations")
         , enableListWindowSlot("List Window", "Enables the Window that shows the list of all Annotations")
+        , shownTagsSlot("Tags", "Set the Tag that should be shown")
         , vbo(0)
         , ibo(0)
         , va(0)
@@ -77,7 +78,7 @@ AnnotationRenderer::AnnotationRenderer()
         , picked_a_point(false)
         , lastX()
         , lastY()
-        , listWindowBooleans({false, false})
+        , listWindowBooleans()
         , pointWindowSizes()
         , annot_win_struct()
         , json_file_path("")
@@ -136,6 +137,13 @@ AnnotationRenderer::AnnotationRenderer()
 
     this->enableListWindowSlot.SetParameter(new core::param::BoolParam(false));
     this->MakeSlotAvailable(&this->enableListWindowSlot);
+
+    this->shownTagsSlot.SetParameter(new core::param::EnumParam(0));
+    this->shownTagsSlot.Param<core::param::EnumParam>()->SetTypePair(0, "All Annotations");
+    this->shownTagsSlot.Param<core::param::EnumParam>()->SetTypePair(1, "First List");
+    this->shownTagsSlot.Param<core::param::EnumParam>()->SetTypePair(2, "Second List");
+    this->shownTagsSlot.Param<core::param::EnumParam>()->SetTypePair(3, "Third List");
+    this->MakeSlotAvailable(&this->shownTagsSlot);
 
     this->json_obj["Points"];
     this->json_obj["SlotValues"];
@@ -462,6 +470,22 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
     ImGui::BeginDisabled();
     ImGui::Checkbox("##", &this->annot_win_struct.end_ts_set);
     ImGui::EndDisabled();
+
+    // List that holds all Tags (except for the "All Annotations" Tag)
+    // With this the user can choose the Tag they want to give the Annotation
+    const char* items[] = {
+        "First List", "Second List", "Third List"};
+    static int item_current = 0;
+    ImGui::Combo("combo", &item_current, items, IM_ARRAYSIZE(items));
+
+    if (ImGui::Button("Set Tag")) {
+        this->annot_win_struct.annot_struct.tag = items[item_current];
+        this->annot_win_struct.tag_set = true;
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled();
+    ImGui::Checkbox("##", &this->annot_win_struct.tag_set);
+    ImGui::EndDisabled();
     
     if (ImGui::Button("Save current coords and Annotation")) {
         // save_new_point_to_json(call, this->annot_win_struct.annot_struct);
@@ -538,7 +562,8 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
                 {x.value()["Annotation"], glm::vec3(temp[0], temp[1], temp[2]), x.value()["Point Name"],
                     false, false, false, x.value()["Start Timestamp"],
                     x.value()["End Timestamp"], glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]),
-                    glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]), false});
+                glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]), false,
+                x.value()["Tag"]});
             // For saving the window Sizes
             this->pointWindowSizes.push_back(glm::vec2(0.0f, 0.0f));
         } else {
@@ -554,6 +579,7 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
             this->all_annotations[i].cam_orientation =
                 glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1], tempCamOrient[2]); // 3,0,1,2 because quat in megamol is x,y,z,w and glm::quat is w,x,y,z
             this->all_annotations[i].currently_editing = false;
+            this->all_annotations[i].tag = x.value()["Tag"];
             // For saving the window Sizes
             this->pointWindowSizes[i] = glm::vec2(0.0f, 0.0f);
         }
@@ -700,6 +726,10 @@ void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
     if (this->all_annotations.size() == 0) {
         return;
     }
+    int tagValue = this->shownTagsSlot.Param<core::param::EnumParam>()->Value();
+    std::string tagsList[4] = {"All Annotations", "First List", "Second List", "Third List"};
+    std::string tagName = tagsList[tagValue];
+    
     float currentTimeStamp = call.Time();
     for (int i = 0; i < all_annotations.size(); ++i) {
         // This is a long if because it has the two cases:
@@ -711,30 +741,35 @@ void AnnotationRenderer::determine_points_to_be_shown(CallRender3DGL& call) {
             (all_annotations[i].end_ts < all_annotations[i].start_ts &&
             (currentTimeStamp >= all_annotations[i].start_ts || currentTimeStamp <= all_annotations[i].end_ts)))
         {
-            showSphereAtPointIndex(call, this->all_annotations[i].coordinates, i);
             this->all_annotations[i].aviable_at_current_time = true;
+            if (this->all_annotations[i].tag == tagName || tagName == "All Annotations") {
+                showSphereAtPointIndex(call, this->all_annotations[i].coordinates, i);
 
-            int t = (frameType + 1) % 2;
-            if (occlusionQuery.queryStarted[2 * i + t]) {
-                glGetQueryObjectuiv(
-                    occlusionQuery.query[2 * i + t], GL_QUERY_RESULT_AVAILABLE, &occlusionQuery.resultAv[2 * i + t]);
-                if (occlusionQuery.resultAv[2 * i + t] == GL_TRUE) {
-                    glGetQueryObjectuiv(
-                        occlusionQuery.query[2 * i + t], GL_QUERY_RESULT, &occlusionQuery.result[2 * i + t]);
-                    if (occlusionQuery.result[2 * i + t] == GL_TRUE) {
-                        this->all_annotations[i].show_point = true;
-                    } else {
-                        this->all_annotations[i].show_point = false;
+                int t = (frameType + 1) % 2;
+                if (occlusionQuery.queryStarted[2 * i + t]) {
+                    glGetQueryObjectuiv(occlusionQuery.query[2 * i + t], GL_QUERY_RESULT_AVAILABLE,
+                        &occlusionQuery.resultAv[2 * i + t]);
+                    if (occlusionQuery.resultAv[2 * i + t] == GL_TRUE) {
+                        glGetQueryObjectuiv(
+                            occlusionQuery.query[2 * i + t], GL_QUERY_RESULT, &occlusionQuery.result[2 * i + t]);
+                        if (occlusionQuery.result[2 * i + t] == GL_TRUE) {
+                            this->all_annotations[i].show_point = true;
+                        } else {
+                            this->all_annotations[i].show_point = false;
+                        }
                     }
                 }
+            } else {
+                this->all_annotations[i].show_point = false;
             }
+            
         } else {
             this->all_annotations[i].show_point = false;
             this->all_annotations[i].aviable_at_current_time = false;
         }
     }
     if (this->drawTextSlot.Param<core::param::BoolParam>()->Value()) {
-        forceDirectedLayout(call);
+        forceDirectedLayout(call, tagName);
     }
     
 }
@@ -905,179 +940,27 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
         window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
     
     ImGui::Begin("Annotation List", p_open, window_flags);
-    static ImGuiTableFlags flags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH |
-                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg |
-                                   ImGuiTableFlags_NoBordersInBody;
-    static ImGuiTableFlags flags_Slider = 0;
-
-    ImGui::Text("Change Flags for this window:");
-    ImGui::Checkbox("Allow Automatic Resizing of this window", &this->listWindowBooleans.autoResize);
-    ImGui::Checkbox("Turn Points Window opaque", &this->listWindowBooleans.opaqueWindowsOfPoints);
     
-    if (ImGui::BeginTable("3ways", 5, flags)) {
-        // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
-        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
-        ImGui::TableSetupColumn("Visibility", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 12.0f);
-        ImGui::TableSetupColumn("Timeline", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
-        ImGui::TableSetupColumn("Start Time", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
-        ImGui::TableSetupColumn("Deleting Point", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
-        ImGui::TableHeadersRow();
-
-        // This is a line for the Explanations of the different columns
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::Text("Tooltips:");
-        ImGui::TableNextColumn();
-        ImGui::SmallButton("Visibility");
-        if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-            ImGui::TextUnformatted("There are three possible colors and names for the visibility of an Annotation.");
-            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Visible");
-            ImGui::SameLine();
-            ImGui::Text("This Annotation is visbile on screen right now.");
-            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Obscurred");
-            ImGui::SameLine();
-            ImGui::Text("This Annotation is currently behind Objects in the scene.");
-            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Hidden");
-            ImGui::SameLine();
-            ImGui::Text("This Annotation is currently not visible in any way.");
-            ImGui::PopTextWrapPos();
-            ImGui::EndTooltip();
+    
+    ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
+    if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+        if (ImGui::BeginTabItem("All Annotations")) {
+            testingFunction(call, "All Annotations");
+            ImGui::EndTabItem();
         }
-
-        ImGui::TableNextColumn();
-        int amountLines = 100.0f;
-        float currentTime = call.Time();
-        float timeSpan = this->totalFrameCount / (float)amountLines;
-        int currentTimeL = currentTime / timeSpan;
-        float arr[100];
-        for (int i = 0; i < amountLines; i++) {
-            if (i == (int)currentTimeL) {
-                arr[i] = 1.0f;
-            } else {
-                arr[i] = 0.0f;
-            }
+        if (ImGui::BeginTabItem("First List")) {
+            testingFunction(call, "First List");
+            ImGui::EndTabItem();
         }
-
-        ImGui::PlotLines("", arr, IM_ARRAYSIZE(arr));
-        
-        ImGui::TableNextColumn();
-        ImGui::SmallButton("Start Time");
-        if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-            ImGui::TextUnformatted("This shows the Frametime when the Annotation starts being visible.");
-            ImGui::PopTextWrapPos();
-            ImGui::EndTooltip();
+        if (ImGui::BeginTabItem("Second List")) {
+            testingFunction(call, "Second List");
+            ImGui::EndTabItem();
         }
-        ImGui::TableNextColumn();
-        ImGui::Checkbox("Enable Deleting", &this->listWindowBooleans.allowDeletion);
-        if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
-            ImGui::TextUnformatted("If enabled, then all below Buttons will delete the corresponding Annotation without further promts.");
-            ImGui::PopTextWrapPos();
-            ImGui::EndTooltip();
+        if (ImGui::BeginTabItem("Third List")) {
+            testingFunction(call, "Third List");
+            ImGui::EndTabItem();
         }
-        
-        // loop over all annotations in all_annotations
-        for (int i = 0; i < this->all_annotations.size(); i++) {
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            std::string treeNodeName = this->all_annotations[i].name + "##" + std::to_string(i);
-            bool open = ImGui::TreeNodeEx(treeNodeName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
-            
-            ImGui::TableNextColumn();
-            std::string text1 = "";
-            ImVec4 color1 = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
-            if (this->all_annotations[i].show_point) {
-                text1 = "Visible";
-                color1 = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // green
-            } else if (this->all_annotations[i].aviable_at_current_time) {
-                text1 = "Obscurred";
-                color1 = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); // yellow
-            } else {
-                text1 = "Hidden";
-                color1 = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // red
-            }
-            ImGui::TextColored(color1, text1.c_str());
-            
-            ImGui::TableNextColumn();
-
-            float startTime = this->all_annotations[i].start_ts;
-            float endTime = this->all_annotations[i].end_ts;
-
-            float startLine = startTime / timeSpan;
-            float endLine = endTime / timeSpan;
-
-            float xs5[100];
-            for (int k = 0; k < amountLines; k++) {
-                if (startTime <= endTime) {
-                    if (k >= startLine && k <= endLine) {
-                        xs5[k] = 1.0f;
-                    } else {
-                        xs5[k] = 0.0f;
-                    }
-                } else if (startTime > endTime) {
-                    if (k >= startLine || k <= endLine) {
-                        xs5[k] = 1.0f;
-                    } else {
-                        xs5[k] = 0.0f;
-                    }
-                }
-            }
-            ImGui::PlotLines("", xs5, IM_ARRAYSIZE(xs5));
-            
-            ImGui::TableNextColumn();
-            // show start time, for sorting
-            ImGui::Text(std::to_string(this->all_annotations[i].start_ts).c_str());
-
-            // Allows deleting the current Annotation. The function for this is called at the end of this loop.
-            bool deleteThis = false;
-            ImGui::TableNextColumn();
-            std::string message = "Delete this Annotation##" + std::to_string(i);
-            if (ImGui::Button(message.c_str())) {
-                if (this->listWindowBooleans.allowDeletion) {
-                    deleteThis = true;
-                }
-            }
-
-            if (open) {
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::TextWrapped(this->all_annotations[i].annotation.c_str());
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                if (ImGui::Button("Load Camera Position")) {
-                    loadCameraPosition(
-                        call, this->all_annotations[i].cam_pos, this->all_annotations[i].cam_orientation);
-                }
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                if (ImGui::Button("Load Time Position")) {
-                    auto thingy = const_cast<frontend_resources::common_types::lua_func_type*>(
-                        &frontend_resources.get<frontend_resources::common_types::lua_func_type>());
-                    std::string tttt = " mmSetParamValue(\"::view::anim::time\", [=[" +
-                                       std::to_string(this->all_annotations[i].start_ts) + "]=])";
-                    (*thingy)(tttt);
-                }
-                std::string open_string = "Open Change Options##" + std::to_string(i);
-                ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-
-                if (ImGui::Button("Edit this Annotation")) {
-                    this->all_annotations[i].currently_editing = true;
-                }   
-
-                ImGui::TreePop();
-            }
-            if (deleteThis) {
-                deleteAnnotation(call, i);
-                i--;
-            }
-        }
-        ImGui::EndTable();
+        ImGui::EndTabBar();
     }
 
     ImGui::End();
@@ -1085,7 +968,7 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
 
 
 /* Function that implements a sort of Spring Embedder for the Shown Annotations on screen to prevent overlapping. */
-void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
+void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call, std::string tagName) {
     // strzct for saving the important position information for each annotation that is shown on screen
     struct tempStruct {
         int indexAllAnnot;        // index of the annotation in the all_annotations vector
@@ -1099,10 +982,13 @@ void AnnotationRenderer::forceDirectedLayout(CallRender3DGL& call) {
 
     for (int i = 0; i < this->all_annotations.size(); i++) {
         if (this->all_annotations[i].show_point) {
-            glm::vec2 currentPointScreenPos = getScreenPosFromWorldCoords(call, this->all_annotations[i].coordinates);
-            glm::vec2 currentPointScreenSize = pointWindowSizes[i];
-            tempStructVector.push_back(tempStruct{
-                i, currentPointScreenPos, currentPointScreenSize, glm::vec2(0.0f, 0.0f), glm::vec2(0.0f, 0.0f)});
+            if (this->all_annotations[i].tag == tagName || tagName == "All Annotations") {
+                glm::vec2 currentPointScreenPos =
+                    getScreenPosFromWorldCoords(call, this->all_annotations[i].coordinates);
+                glm::vec2 currentPointScreenSize = pointWindowSizes[i];
+                tempStructVector.push_back(tempStruct{
+                    i, currentPointScreenPos, currentPointScreenSize, glm::vec2(0.0f, 0.0f), glm::vec2(0.0f, 0.0f)});
+            }
         }
     }
 
@@ -1214,6 +1100,18 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
         this->all_annotations[index].cam_pos = call.GetCamera().getPose().position;
         this->all_annotations[index].cam_orientation = call.GetCamera().getPose().to_quat();
     }
+    ImGui::Text("Current Tag: ");
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), this->all_annotations[index].tag.c_str());
+    // List that holds all Tags (except for the "All Annotations" Tag)
+    // With this the user can choose the Tag they want to give the Annotation
+    const char* items[] = {"First List", "Second List", "Third List"};
+    static int item_current = 0;
+    ImGui::Combo("Choose Tag", &item_current, items, IM_ARRAYSIZE(items));
+
+    if (ImGui::Button("Set Tag")) {
+        this->all_annotations[index].tag = items[item_current];
+    }
 
     if (ImGui::Button("Restore Values from json_obj")) {
         loadOldValuesFromJsonobj(call, index);
@@ -1267,7 +1165,8 @@ void AnnotationRenderer::updateAnnotationInJsonObj(CallRender3DGL& call, int i) 
         {"Annotation", input.annotation}, {"Point Name", input.name}, {"Start Timestamp", input.start_ts},
         {"End Timestamp", input.end_ts}, {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
         {"Camera Orientation",
-            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}};
+            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}},
+        {"Tag", input.tag}};
 }
 
 /* Saves the current state of the variable "json_obj" into the json file for the currently used project.
@@ -1286,6 +1185,7 @@ void AnnotationRenderer::save_json_to_file() {
     }
     std::ofstream o(file_path);
     o << std::setw(4) << this->json_obj << std::endl;
+    std::cout << std::setw(4) << this->json_obj << std::endl;
 }
 
 /* Saves the given struct to the Vector all_annotations
@@ -1295,12 +1195,12 @@ void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct in
     this->all_annotations.push_back(input);
     this->pointWindowSizes.push_back(glm::vec2(0.0f, 0.0f));
 
-    json_obj["Points"].push_back({
-        {"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
+    json_obj["Points"].push_back({{"Coordinates", {input.coordinates.x, input.coordinates.y, input.coordinates.z}},
         {"Annotation", input.annotation}, {"Point Name", input.name}, {"Start Timestamp", input.start_ts},
         {"End Timestamp", input.end_ts}, {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
         {"Camera Orientation",
-            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}}});
+            {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}},
+        {"Tag", input.tag}});
 
     occlusionQuery.query.clear();
     occlusionQuery.query.resize(2 * all_annotations.size());
@@ -1333,4 +1233,191 @@ void AnnotationRenderer::loadOldValuesFromJsonobj(CallRender3DGL& call, int i) {
     this->all_annotations[i].cam_pos = glm::vec3(tempCamPos[0], tempCamPos[1], tempCamPos[2]);
     this->all_annotations[i].cam_orientation = glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1],
         tempCamOrient[2]); // 3,0,1,2 because quat in megamol is x,y,z,w and glm::quat is w,x,y,z
+    // TODO: TAG? if it is changable
+}
+
+
+
+void AnnotationRenderer::testingFunction(CallRender3DGL& call, std::string wantedTag) {
+    const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
+    const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
+    static ImGuiTableFlags flags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH |
+                                   ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody;
+    static ImGuiTableFlags flags_Slider = 0;
+
+    ImGui::Text("Change Flags for this window:");
+    ImGui::Checkbox("Allow Automatic Resizing of this window", &this->listWindowBooleans.autoResize);
+    ImGui::Checkbox("Turn Points Window opaque", &this->listWindowBooleans.opaqueWindowsOfPoints);
+
+    if (ImGui::BeginTable("3ways", 5, flags)) {
+        // The first column will use the default _WidthStretch when ScrollX is Off and _WidthFixed when ScrollX is On
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
+        ImGui::TableSetupColumn("Visibility", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 12.0f);
+        ImGui::TableSetupColumn("Timeline", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
+        ImGui::TableSetupColumn("Start Time", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
+        ImGui::TableSetupColumn("Deleting Point", ImGuiTableColumnFlags_WidthFixed, TEXT_BASE_WIDTH * 18.0f);
+        ImGui::TableHeadersRow();
+
+        // This is a line for the Explanations of the different columns
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::Text("Tooltips:");
+        ImGui::TableNextColumn();
+        ImGui::SmallButton("Visibility");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            ImGui::TextUnformatted("There are three possible colors and names for the visibility of an Annotation.");
+            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Visible");
+            ImGui::SameLine();
+            ImGui::Text("This Annotation is visbile on screen right now.");
+            ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "Obscurred");
+            ImGui::SameLine();
+            ImGui::Text("This Annotation is currently behind Objects in the scene.");
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "Hidden");
+            ImGui::SameLine();
+            ImGui::Text("This Annotation is currently not visible in any way.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+
+        ImGui::TableNextColumn();
+        int amountLines = 100.0f;
+        float currentTime = call.Time();
+        float timeSpan = this->totalFrameCount / (float)amountLines;
+        int currentTimeL = currentTime / timeSpan;
+        float arr[100];
+        for (int i = 0; i < amountLines; i++) {
+            if (i == (int)currentTimeL) {
+                arr[i] = 1.0f;
+            } else {
+                arr[i] = 0.0f;
+            }
+        }
+
+        ImGui::PlotLines("", arr, IM_ARRAYSIZE(arr));
+
+        ImGui::TableNextColumn();
+        ImGui::SmallButton("Start Time");
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            ImGui::TextUnformatted("This shows the Frametime when the Annotation starts being visible.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+        ImGui::TableNextColumn();
+        ImGui::Checkbox("Enable Deleting", &this->listWindowBooleans.allowDeletion);
+        if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+            ImGui::TextUnformatted(
+                "If enabled, then all below Buttons will delete the corresponding Annotation without further promts.");
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+
+        // loop over all annotations in all_annotations
+        for (int i = 0; i < this->all_annotations.size(); i++) {
+            if (wantedTag != "All Annotations") {
+                if (this->all_annotations[i].tag != wantedTag) {
+                    continue;
+                }
+            }
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            std::string treeNodeName = this->all_annotations[i].name + "##" + std::to_string(i);
+            bool open = ImGui::TreeNodeEx(treeNodeName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
+
+            ImGui::TableNextColumn();
+            std::string text1 = "";
+            ImVec4 color1 = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+            if (this->all_annotations[i].show_point) {
+                text1 = "Visible";
+                color1 = ImVec4(0.0f, 1.0f, 0.0f, 1.0f); // green
+            } else if (this->all_annotations[i].aviable_at_current_time) {
+                text1 = "Obscurred";
+                color1 = ImVec4(1.0f, 1.0f, 0.0f, 1.0f); // yellow
+            } else {
+                text1 = "Hidden";
+                color1 = ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // red
+            }
+            ImGui::TextColored(color1, text1.c_str());
+
+            ImGui::TableNextColumn();
+
+            float startTime = this->all_annotations[i].start_ts;
+            float endTime = this->all_annotations[i].end_ts;
+
+            float startLine = startTime / timeSpan;
+            float endLine = endTime / timeSpan;
+
+            float xs5[100];
+            for (int k = 0; k < amountLines; k++) {
+                if (startTime <= endTime) {
+                    if (k >= startLine && k <= endLine) {
+                        xs5[k] = 1.0f;
+                    } else {
+                        xs5[k] = 0.0f;
+                    }
+                } else if (startTime > endTime) {
+                    if (k >= startLine || k <= endLine) {
+                        xs5[k] = 1.0f;
+                    } else {
+                        xs5[k] = 0.0f;
+                    }
+                }
+            }
+            ImGui::PlotLines("", xs5, IM_ARRAYSIZE(xs5));
+
+            ImGui::TableNextColumn();
+            // show start time, for sorting
+            ImGui::Text(std::to_string(this->all_annotations[i].start_ts).c_str());
+
+            // Allows deleting the current Annotation. The function for this is called at the end of this loop.
+            bool deleteThis = false;
+            ImGui::TableNextColumn();
+            std::string message = "Delete this Annotation##" + std::to_string(i);
+            if (ImGui::Button(message.c_str())) {
+                if (this->listWindowBooleans.allowDeletion) {
+                    deleteThis = true;
+                }
+            }
+
+            if (open) {
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextWrapped(this->all_annotations[i].annotation.c_str());
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (ImGui::Button("Load Camera Position")) {
+                    loadCameraPosition(
+                        call, this->all_annotations[i].cam_pos, this->all_annotations[i].cam_orientation);
+                }
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                if (ImGui::Button("Load Time Position")) {
+                    auto thingy = const_cast<frontend_resources::common_types::lua_func_type*>(
+                        &frontend_resources.get<frontend_resources::common_types::lua_func_type>());
+                    std::string tttt = " mmSetParamValue(\"::view::anim::time\", [=[" +
+                                       std::to_string(this->all_annotations[i].start_ts) + "]=])";
+                    (*thingy)(tttt);
+                }
+                std::string open_string = "Open Change Options##" + std::to_string(i);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+
+                if (ImGui::Button("Edit this Annotation")) {
+                    this->all_annotations[i].currently_editing = true;
+                }
+
+                ImGui::TreePop();
+            }
+            if (deleteThis) {
+                deleteAnnotation(call, i);
+                i--;
+            }
+        }
+        ImGui::EndTable();
+    }
 }
