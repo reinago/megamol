@@ -268,7 +268,7 @@ private:
 
     void loadOldValuesFromJsonobj(megamol::mmstd_gl::CallRender3DGL& call, int i);
 
-    void testingFunction(megamol::mmstd_gl::CallRender3DGL& call, std::string wantedTag);
+    void listWindowTables(megamol::mmstd_gl::CallRender3DGL& call, std::string wantedTag);
 
     
     /* Parameters */

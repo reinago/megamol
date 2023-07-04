@@ -945,19 +945,19 @@ void AnnotationRenderer::list_Window(CallRender3DGL& call) {
     ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
     if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
         if (ImGui::BeginTabItem("All Annotations")) {
-            testingFunction(call, "All Annotations");
+            listWindowTables(call, "All Annotations");
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("First List")) {
-            testingFunction(call, "First List");
+            listWindowTables(call, "First List");
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Second List")) {
-            testingFunction(call, "Second List");
+            listWindowTables(call, "Second List");
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("Third List")) {
-            testingFunction(call, "Third List");
+            listWindowTables(call, "Third List");
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -1238,7 +1238,7 @@ void AnnotationRenderer::loadOldValuesFromJsonobj(CallRender3DGL& call, int i) {
 
 
 
-void AnnotationRenderer::testingFunction(CallRender3DGL& call, std::string wantedTag) {
+void AnnotationRenderer::listWindowTables(CallRender3DGL& call, std::string wantedTag) {
     const float TEXT_BASE_WIDTH = ImGui::CalcTextSize("A").x;
     const float TEXT_BASE_HEIGHT = ImGui::GetTextLineHeightWithSpacing();
     static ImGuiTableFlags flags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH |
