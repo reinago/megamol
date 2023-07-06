@@ -59,7 +59,10 @@ struct annotation_struct {
     bool currently_editing = false;
     // String for Tags of the Annotations for filtering
     std::string tag = "";
-    
+    // Color of the shown Point for this annotation
+    glm::vec4 color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    // Bool for tracking if the global color should be used (false) or an individual color is set for this annotation (true)
+    bool show_color = false;
 };
 
 // Struct for saving all variables that are needed for the "Adding Annotation" Window
@@ -85,6 +88,8 @@ struct annot_window_struct {
     // String for Tags of the Annotations for filtering
     std::string tag = "";
     bool tag_set = false;
+
+    bool color_set = false;
 };
 
 struct occlusionQueries {

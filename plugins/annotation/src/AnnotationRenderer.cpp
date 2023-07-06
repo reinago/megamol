@@ -444,7 +444,18 @@ void AnnotationRenderer::showAddingAnotationWindow(CallRender3DGL& call, std::st
         }
     }
 
-    ImGui::ColorEdit4("Set Color of Sphere", this->annot_win_struct.color);
+    ImGui::ColorEdit4("Sphere Color", this->annot_win_struct.color);
+
+    if (ImGui::Button("Toggle individual color##")) { //TODO: better Titel for this Button, to prevent missunderstandings.
+        this->annot_win_struct.color_set = true;
+        this->annot_win_struct.annot_struct.color = glm::vec4(
+            annot_win_struct.color[0], annot_win_struct.color[1], annot_win_struct.color[2], annot_win_struct.color[3]);
+        this->annot_win_struct.annot_struct.show_color = true;
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled();
+    ImGui::Checkbox("##", &this->annot_win_struct.color_set);
+    ImGui::EndDisabled();
 
     ImGui::Checkbox("Show Sphere", &this->annot_win_struct.show_point);
     if (this->annot_win_struct.show_point) {
@@ -583,6 +594,11 @@ void AnnotationRenderer::write_json_obj_data_to_vectors(CallRender3DGL& call, bo
             // For saving the window Sizes
             this->pointWindowSizes[i] = glm::vec2(0.0f, 0.0f);
         }
+        if (x.value().contains("Color")) {
+            auto tempColor = x.value()["Color"];
+            this->all_annotations[i].color = glm::vec4(tempColor[0], tempColor[1], tempColor[2], tempColor[3]);
+            this->all_annotations[i].show_color = x.value()["Show Color"];
+        } //TODO: Maybe do this for ALL "variabeles"? then it is easier to add more in the future without breaking ALL import files..
     }
     for (int i = 0; i < pointWindowSizes.size(); ++i) {
         display_visual_points_windows(call, this->all_annotations[i].name, i, this->all_annotations[i].coordinates,
@@ -911,7 +927,12 @@ void AnnotationRenderer::showSphereAtPointIndex(CallRender3DGL& call, glm::vec3 
     this->sphereShader->setUniform("camPos", cam_pose.position.x, cam_pose.position.y, cam_pose.position.z);
     this->sphereShader->setUniform("camDir", cam_pose.direction.x, cam_pose.direction.y, cam_pose.direction.z);
     this->sphereShader->setUniform("scalingFactor", this->sizeScalingSlot.Param<core::param::FloatParam>()->Value());
-    this->sphereShader->setUniform("myColor", colptr[0], colptr[1], colptr[2], colptr[3]);
+    if (this->all_annotations[index].show_color) { // check if an individual color is set for this annotation
+        glm::vec4 tempColor = this->all_annotations[index].color;
+        this->sphereShader->setUniform("myColor", tempColor[0], tempColor[1], tempColor[2], tempColor[3]);
+    } else {
+        this->sphereShader->setUniform("myColor", colptr[0], colptr[1], colptr[2], colptr[3]);
+    }
 
     // Render a point at the given coordinates
     // Start the query for the point
@@ -1100,6 +1121,16 @@ void AnnotationRenderer::editing_Annotations_Window(CallRender3DGL& call, int in
         this->all_annotations[index].cam_pos = call.GetCamera().getPose().position;
         this->all_annotations[index].cam_orientation = call.GetCamera().getPose().to_quat();
     }
+
+    // Allows changing the Color of the Sphere for this annotation
+    float temp[4] = {this->all_annotations[index].color[0], this->all_annotations[index].color[1],
+        this->all_annotations[index].color[2], this->all_annotations[index].color[3]};
+    ImGui::ColorEdit4("Sphere Color", temp);
+    this->all_annotations[index].color = glm::vec4(temp[0], temp[1], temp[2], temp[3]);
+    
+    ImGui::Checkbox("Toggle individual color##", &this->all_annotations[index].show_color);
+    
+    
     ImGui::Text("Current Tag: ");
     ImGui::SameLine();
     ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), this->all_annotations[index].tag.c_str());
@@ -1166,7 +1197,8 @@ void AnnotationRenderer::updateAnnotationInJsonObj(CallRender3DGL& call, int i) 
         {"End Timestamp", input.end_ts}, {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
         {"Camera Orientation",
             {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}},
-        {"Tag", input.tag}};
+        {"Tag", input.tag}, {"Color", {input.color[0], input.color[1], input.color[2], input.color[3]}},
+        {"Show Color", input.show_color}};
 }
 
 /* Saves the current state of the variable "json_obj" into the json file for the currently used project.
@@ -1200,7 +1232,9 @@ void AnnotationRenderer::saveNewPoint(CallRender3DGL& call, annotation_struct in
         {"End Timestamp", input.end_ts}, {"Camera Position", {input.cam_pos.x, input.cam_pos.y, input.cam_pos.z}},
         {"Camera Orientation",
             {input.cam_orientation.x, input.cam_orientation.y, input.cam_orientation.z, input.cam_orientation.w}},
-        {"Tag", input.tag}});
+        {"Tag", input.tag}, {"Color", {input.color[0], input.color[1], input.color[2], input.color[3]}}, {"Show Color", input.show_color}});
+
+
 
     occlusionQuery.query.clear();
     occlusionQuery.query.resize(2 * all_annotations.size());
@@ -1234,6 +1268,11 @@ void AnnotationRenderer::loadOldValuesFromJsonobj(CallRender3DGL& call, int i) {
     this->all_annotations[i].cam_orientation = glm::quat(tempCamOrient[3], tempCamOrient[0], tempCamOrient[1],
         tempCamOrient[2]); // 3,0,1,2 because quat in megamol is x,y,z,w and glm::quat is w,x,y,z
     // TODO: TAG? if it is changable
+    if (tempObject.contains("Color")) {
+        this->all_annotations[i].color =
+            glm::vec4(tempObject["Color"][0], tempObject["Color"][1], tempObject["Color"][2], tempObject["Color"][3]);
+        this->all_annotations[i].show_color = tempObject["Show Color"];
+    }
 }
 
 
